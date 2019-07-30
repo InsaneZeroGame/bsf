@@ -58,6 +58,7 @@ namespace bs
 
 	public:
 		GUIElement(String styleName, const GUIDimensions& dimensions, GUIElementOptions options = GUIElementOptions(0));
+		GUIElement(const char* styleName, const GUIDimensions& dimensions, GUIElementOptions options = GUIElementOptions(0));
 		virtual ~GUIElement() = default;
 
 		/**	

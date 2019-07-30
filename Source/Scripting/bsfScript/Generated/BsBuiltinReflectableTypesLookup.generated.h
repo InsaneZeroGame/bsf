@@ -4,6 +4,8 @@
 
 #include "Serialization/BsBuiltinReflectableTypesLookup.h"
 #include "Reflection/BsRTTIType.h"
+#include "../../../Foundation/bsfCore/Animation/BsSkeleton.h"
+#include "BsScriptSkeleton.generated.h"
 #include "../../../Foundation/bsfCore/Renderer/BsRenderSettings.h"
 #include "BsScriptAmbientOcclusionSettings.generated.h"
 #include "../../../Foundation/bsfCore/Particles/BsParticleEvolver.h"
@@ -20,8 +22,6 @@
 #include "BsScriptBloomSettings.generated.h"
 #include "../../../Foundation/bsfCore/Animation/BsMorphShapes.h"
 #include "BsScriptMorphShapes.generated.h"
-#include "../../../Foundation/bsfCore/Animation/BsSkeleton.h"
-#include "BsScriptSkeleton.generated.h"
 #include "../../../Foundation/bsfCore/Text/BsFont.h"
 #include "BsScriptFontBitmap.generated.h"
 #include "../../../Foundation/bsfCore/Animation/BsMorphShapes.h"
@@ -40,6 +40,8 @@
 #include "BsScriptRenderTarget.generated.h"
 #include "../../../Foundation/bsfCore/Particles/BsParticleEvolver.h"
 #include "BsScriptParticleGravity.generated.h"
+#include "../../../Foundation/bsfCore/Renderer/BsRenderSettings.h"
+#include "BsScriptScreenSpaceLensFlareSettings.generated.h"
 #include "../../../Foundation/bsfCore/Renderer/BsRenderSettings.h"
 #include "BsScriptAutoExposureSettings.generated.h"
 #include "../../../Foundation/bsfCore/Renderer/BsRenderSettings.h"
@@ -140,6 +142,7 @@
 namespace bs
 {
 	LOOKUP_BEGIN(BuiltinReflectableTypes)
+		ADD_ENTRY(Skeleton, ScriptSkeleton)
 		ADD_ENTRY(AmbientOcclusionSettings, ScriptAmbientOcclusionSettings)
 		ADD_ENTRY(ParticleEvolver, ScriptParticleEvolver)
 		ADD_ENTRY(RenderTexture, ScriptRenderTexture)
@@ -149,7 +152,6 @@ namespace bs
 		ADD_ENTRY(ParticleEmitterStaticMeshShape, ScriptParticleEmitterStaticMeshShape)
 		ADD_ENTRY(BloomSettings, ScriptBloomSettings)
 		ADD_ENTRY(MorphShapes, ScriptMorphShapes)
-		ADD_ENTRY(Skeleton, ScriptSkeleton)
 		ADD_ENTRY(FontBitmap, ScriptFontBitmap)
 		ADD_ENTRY(MorphShape, ScriptMorphShape)
 		ADD_ENTRY(MorphChannel, ScriptMorphChannel)
@@ -160,6 +162,7 @@ namespace bs
 		ADD_ENTRY(Viewport, ScriptViewport)
 		ADD_ENTRY(RenderTarget, ScriptRenderTarget)
 		ADD_ENTRY(ParticleGravity, ScriptParticleGravity)
+		ADD_ENTRY(ScreenSpaceLensFlareSettings, ScriptScreenSpaceLensFlareSettings)
 		ADD_ENTRY(AutoExposureSettings, ScriptAutoExposureSettings)
 		ADD_ENTRY(TonemappingSettings, ScriptTonemappingSettings)
 		ADD_ENTRY(WhiteBalanceSettings, ScriptWhiteBalanceSettings)

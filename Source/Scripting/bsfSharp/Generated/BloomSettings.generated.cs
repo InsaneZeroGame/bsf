@@ -31,7 +31,7 @@ namespace bs
 		}
 
 		/// <summary>
-		/// Quality of the bloom effect. Higher values will use higher resolution texture for calculating bloom, at the cost of 
+		/// Quality of the bloom effect. Higher values will use higher resolution texture for calculating bloom, at the cost of
 		/// lower performance. Valid range is [0, 3], default is 2.
 		/// </summary>
 		[ShowInInspector]
@@ -43,8 +43,8 @@ namespace bs
 		}
 
 		/// <summary>
-		/// Determines the minimal threshold of pixel luminance to be included in the bloom calculations. Any pixel with 
-		/// luminance below this value will be ignored for the purposes of bloom. The value represents luminance after it is 
+		/// Determines the minimal threshold of pixel luminance to be included in the bloom calculations. Any pixel with
+		/// luminance below this value will be ignored for the purposes of bloom. The value represents luminance after it is
 		/// scaled by exposure. Set to zero or negative to disable the threshold and include all pixels in the calculations.
 		/// </summary>
 		[ShowInInspector]
@@ -82,6 +82,19 @@ namespace bs
 			set { Internal_settint(mCachedPtr, ref value); }
 		}
 
+		/// <summary>
+		/// Determines the percent of the texture to account for when filtering for bloom. Larger values will include farther
+		/// away pixels.
+		/// </summary>
+		[ShowInInspector]
+		[Range(0.01f, 1f, false)]
+		[NativeWrapper]
+		public float FilterSize
+		{
+			get { return Internal_getfilterSize(mCachedPtr); }
+			set { Internal_setfilterSize(mCachedPtr, value); }
+		}
+
 		[MethodImpl(MethodImplOptions.InternalCall)]
 		private static extern void Internal_BloomSettings(BloomSettings managedInstance);
 		[MethodImpl(MethodImplOptions.InternalCall)]
@@ -104,6 +117,10 @@ namespace bs
 		private static extern void Internal_gettint(IntPtr thisPtr, out Color __output);
 		[MethodImpl(MethodImplOptions.InternalCall)]
 		private static extern void Internal_settint(IntPtr thisPtr, ref Color value);
+		[MethodImpl(MethodImplOptions.InternalCall)]
+		private static extern float Internal_getfilterSize(IntPtr thisPtr);
+		[MethodImpl(MethodImplOptions.InternalCall)]
+		private static extern void Internal_setfilterSize(IntPtr thisPtr, float value);
 	}
 
 	/** @} */

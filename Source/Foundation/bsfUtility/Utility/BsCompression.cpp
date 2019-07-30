@@ -69,7 +69,7 @@ namespace bs
 				mReportProgress(1.0f - mRemaining / (float)mTotal);
 		}
 	private:
-		SPtr<DataStream> mStream; 
+		SPtr<DataStream> mStream;
 		std::function<void(float)> mReportProgress;
 
 		size_t mRemaining;
@@ -192,7 +192,7 @@ namespace bs
 
 		if (!snappy::Uncompress(&src, &dst))
 		{
-			LOGERR("Decompression failed, corrupt data.");
+			BS_LOG(Error, Generic, "Decompression failed, corrupt data.");
 			return nullptr;
 		}
 

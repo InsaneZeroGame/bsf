@@ -54,7 +54,7 @@ namespace bs
 		enum { id = TID_SpriteSheetGridAnimation }; enum { hasDynamicSize = 1 };
 
 		static void toMemory(const SpriteSheetGridAnimation& data, char* memory)
-		{ 
+		{
 			static constexpr UINT32 VERSION = 0;
 
 			const UINT32 size = getDynamicSize(data);
@@ -68,7 +68,7 @@ namespace bs
 		}
 
 		static UINT32 fromMemory(SpriteSheetGridAnimation& data, char* memory)
-		{ 
+		{
 			UINT32 size = 0;
 			memory = rttiReadElem(size, memory);
 
@@ -86,7 +86,7 @@ namespace bs
 			}
 				break;
 			default:
-				LOGERR("Unknown version. Unable to deserialize.");
+				BS_LOG(Error, RTTI, "Unknown version. Unable to deserialize.");
 				break;
 			}
 
@@ -94,7 +94,7 @@ namespace bs
 		}
 
 		static UINT32 getDynamicSize(const SpriteSheetGridAnimation& data)
-		{ 
+		{
 			UINT32 size = sizeof(UINT32) * 2 + rttiGetElemSize(data.numRows) + rttiGetElemSize(data.numColumns) +
 				rttiGetElemSize(data.count) + rttiGetElemSize(data.fps);
 			return size;

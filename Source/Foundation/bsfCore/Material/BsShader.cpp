@@ -35,7 +35,7 @@ namespace bs
 	{
 		if(paramDesc.type == GPDT_STRUCT && paramDesc.elementSize <= 0)
 		{
-			LOGERR("You need to provide a non-zero element size for a struct parameter.");
+			BS_LOG(Error, Material, "You need to provide a non-zero element size for a struct parameter.");
 			return;
 		}
 
@@ -170,7 +170,7 @@ namespace bs
 
 		if(!paramDesc)
 		{
-			LOGWRN("Attempting to apply a shader parameter attribute to a non-existing parameter.");
+			BS_LOG(Warning, Material, "Attempting to apply a shader parameter attribute to a non-existing parameter.");
 			return;
 		}
 
@@ -178,13 +178,13 @@ namespace bs
 		{
 			if(paramDescObj)
 			{
-				LOGWRN("Attempting to apply SpriteUV attribute to an object parameter is not supported.");
+				BS_LOG(Warning, Material, "Attempting to apply SpriteUV attribute to an object parameter is not supported.");
 				return;
 			}
 
 			if(paramDescData->type != GPDT_FLOAT4)
 			{
-				LOGWRN("SpriteUV attribute can only be applied to 4D vectors.");
+				BS_LOG(Warning, Material, "SpriteUV attribute can only be applied to 4D vectors.");
 				return;
 			}
 		}
@@ -219,7 +219,7 @@ namespace bs
 	}
 
 	template<bool Core>
-	void TSHADER_DESC<Core>::setParamBlockAttribs(const String& name, bool shared, GpuBufferUsage usage, 
+	void TSHADER_DESC<Core>::setParamBlockAttribs(const String& name, bool shared, GpuBufferUsage usage,
 		StringID rendererSemantic)
 	{
 		SHADER_PARAM_BLOCK_DESC desc;
@@ -245,7 +245,7 @@ namespace bs
 	{ }
 
 	template<bool Core>
-	TShader<Core>::~TShader() 
+	TShader<Core>::~TShader()
 	{ }
 
 	template<bool Core>

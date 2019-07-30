@@ -6,6 +6,13 @@
 
 namespace bs
 {
+	GUIElementContainer::GUIElementContainer(const GUIDimensions& dimensions, const char* style, 
+		GUIElementOptions options)
+		:GUIElement(style, dimensions, options)
+	{
+		mOptionFlags.set(GUIElementOption::ClickThrough);
+	}
+
 	GUIElementContainer::GUIElementContainer(const GUIDimensions& dimensions, const String& style, 
 		GUIElementOptions options)
 		:GUIElement(style, dimensions, options)

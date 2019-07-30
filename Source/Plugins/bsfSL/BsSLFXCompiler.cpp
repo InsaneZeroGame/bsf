@@ -37,14 +37,14 @@ namespace bs
 	// Print out the FX AST, only for debug purposes
 	void SLFXDebugPrint(ASTFXNode* node, String indent)
 	{
-		LOGDBG(indent + "NODE " + toString(node->type));
+		BS_LOG(Info, BSLCompiler, indent + "NODE {0}", node->type);
 
 		for (int i = 0; i < node->options->count; i++)
 		{
 			OptionDataType odt = OPTION_LOOKUP[(int)node->options->entries[i].type].dataType;
 			if (odt == ODT_Complex)
 			{
-				LOGDBG(indent + toString(i) + ". " + toString(node->options->entries[i].type));
+				BS_LOG(Info, BSLCompiler, "{0}{1}. {2}", indent, i, node->options->entries[i].type);
 				SLFXDebugPrint(node->options->entries[i].value.nodePtr, indent + "\t");
 				continue;
 			}
@@ -74,7 +74,7 @@ namespace bs
 				break;
 			}
 
-			LOGDBG(indent + toString(i) + ". " + toString(node->options->entries[i].type) + " = " + value);
+			BS_LOG(Info, BSLCompiler, "{0}{1}. {2} = {3}", indent, i, node->options->entries[i].type, value);
 		}
 	}
 
@@ -445,6 +445,28 @@ namespace bs
 				continue;
 
 			String ident = entry.ident.c_str();
+			auto parseCommonAttributes = [&entry, &ident, &desc]()
+			{
+				if (!entry.readableName.empty())
+				{
+					SHADER_PARAM_ATTRIBUTE attribute;
+					attribute.value.assign(entry.readableName.data(), entry.readableName.size());
+					attribute.nextParamIdx = (UINT32)-1;
+					attribute.type = ShaderParamAttributeType::Name;
+
+					desc.setParameterAttribute(ident, attribute);
+				}
+
+				if ((entry.flags & Xsc::Reflection::Uniform::Flags::HideInInspector) != 0)
+				{
+					SHADER_PARAM_ATTRIBUTE attribute;
+					attribute.nextParamIdx = (UINT32)-1;
+					attribute.type = ShaderParamAttributeType::HideInInspector;
+
+					desc.setParameterAttribute(ident, attribute);
+				}
+			};
+
 			switch(entry.type)
 			{
 			case Xsc::Reflection::VariableType::UniformBuffer:
@@ -468,6 +490,8 @@ namespace bs
 							desc.addParameter(SHADER_OBJECT_PARAM_DESC(ident, ident, objType),
 								getBuiltinTexture(defVal.integer));
 						}
+
+						parseCommonAttributes();
 					}
 					else
 					{
@@ -478,6 +502,8 @@ namespace bs
 
 						objType = ReflTypeToBufferType((Xsc::Reflection::BufferType)entry.baseType);
 						desc.addParameter(SHADER_OBJECT_PARAM_DESC(ident, ident, objType));
+
+						parseCommonAttributes();
 					}
 				}
 				break;
@@ -548,7 +574,7 @@ namespace bs
 					{
 						const Xsc::Reflection::DefaultValue& defVal = reflData.defaultValues[entry.defaultValue];
 
-						desc.addParameter(SHADER_DATA_PARAM_DESC(ident, ident, type, StringID::NONE, arraySize, 0), 
+						desc.addParameter(SHADER_DATA_PARAM_DESC(ident, ident, type, StringID::NONE, arraySize, 0),
 							(UINT8*)defVal.matrix);
 					}
 
@@ -561,6 +587,8 @@ namespace bs
 
 						desc.setParameterAttribute(ident, attribute);
 					}
+
+					parseCommonAttributes();
 				}
 			}
 				break;
@@ -703,7 +731,7 @@ namespace bs
 				StringStream logOutput;
 				log.getMessages(logOutput);
 
-				LOGERR("Shader cross compilation failed. Log: \n\n" + logOutput.str());
+				BS_LOG(Error, BSLCompiler, "Shader cross compilation failed. Log: \n\n{0}", logOutput.str());
 				return "";
 			}
 		}
@@ -741,7 +769,7 @@ namespace bs
 				StringStream logOutput;
 				log.getMessages(logOutput);
 
-				LOGERR("Shader cross compilation failed. Log: \n\n" + logOutput.str());
+				BS_LOG(Error, BSLCompiler, "Shader cross compilation failed. Log: \n\n{0}", logOutput.str());
 				return "";
 			}
 		}
@@ -811,23 +839,26 @@ namespace bs
 
 		state = yy_scan_string(source, scanner);
 
-		if (yyparse(parseState, scanner))
+		bool parsingFailed = yyparse(parseState, scanner) > 0;
+
+		if (parseState->hasError > 0)
 		{
-			if (parseState->hasError > 0)
-			{
-				output.errorMessage = parseState->errorMessage;
-				output.errorLine = parseState->errorLine;
-				output.errorColumn = parseState->errorColumn;
+			output.errorMessage = parseState->errorMessage;
+			output.errorLine = parseState->errorLine;
+			output.errorColumn = parseState->errorColumn;
 
-				if (parseState->errorFile != nullptr)
-					output.errorFile = parseState->errorFile;
-			}
-			else
-				output.errorMessage = "Internal error: Parsing failed.";
+			if (parseState->errorFile != nullptr)
+				output.errorFile = parseState->errorFile;
 
-			return output;
+			goto cleanup;
+		}
+		else if(parsingFailed)
+		{
+			output.errorMessage = "Internal error: Parsing failed.";
+			goto cleanup;
 		}
 
+cleanup:
 		yy_delete_buffer(state, scanner);
 		yylex_destroy(scanner);
 
@@ -1017,7 +1048,10 @@ namespace bs
 			switch (option->type)
 			{
 			case OT_AttrName:
-				attributeData.attributes.push_back(std::pair<INT32, String>(OT_AttrName, option->value.strValue));
+				attributeData.attributes.push_back(std::pair<INT32, String>(OT_AttrName, removeQuotes(option->value.strValue)));
+				break;
+			case OT_AttrShow:
+				attributeData.attributes.push_back(std::pair<INT32, String>(OT_AttrShow, ""));
 				break;
 			default:
 				break;
@@ -1281,12 +1315,10 @@ namespace bs
 		}
 	}
 
-	void BSLFXCompiler::parseRenderTargetBlendState(BLEND_STATE_DESC& desc, ASTFXNode* targetNode)
+	void BSLFXCompiler::parseRenderTargetBlendState(BLEND_STATE_DESC& desc, ASTFXNode* targetNode, UINT32& index)
 	{
 		if (targetNode == nullptr || targetNode->type != NT_Target)
 			return;
-
-		UINT32 index = 0;
 
 		for (int i = 0; i < targetNode->options->count; i++)
 		{
@@ -1328,6 +1360,8 @@ namespace bs
 				break;
 			}
 		}
+
+		index++;
 	}
 
 	bool BSLFXCompiler::parseBlendState(PassData& desc, ASTFXNode* blendNode)
@@ -1336,6 +1370,7 @@ namespace bs
 			return false;
 
 		bool isDefault = true;
+		SmallVector<ASTFXNode*, 8> targets;
 
 		for (int i = 0; i < blendNode->options->count; i++)
 		{
@@ -1352,13 +1387,19 @@ namespace bs
 				isDefault = false;
 				break;
 			case OT_Target:
-				parseRenderTargetBlendState(desc.blendDesc, option->value.nodePtr);
+				targets.add(option->value.nodePtr);
 				isDefault = false;
 				break;
 			default:
 				break;
 			}
 		}
+
+		// Parse targets in reverse as their order matters and we want to visit them in the top-down order as defined in
+		// the source code
+		UINT32 index = 0;
+		for(auto iter = targets.rbegin(); iter != targets.rend(); ++iter)
+			parseRenderTargetBlendState(desc.blendDesc, *iter, index);
 
 		return !isDefault;
 	}
@@ -1800,7 +1841,7 @@ namespace bs
 
 	BSLFXCompileResult BSLFXCompiler::compileTechniques(
 		const Vector<std::pair<ASTFXNode*, ShaderMetaData>>& shaderMetaData, const String& source,
-		const UnorderedMap<String, String>& defines, ShadingLanguageFlags languages, SHADER_DESC& shaderDesc, 
+		const UnorderedMap<String, String>& defines, ShadingLanguageFlags languages, SHADER_DESC& shaderDesc,
 		Vector<String>& includes)
 	{
 		BSLFXCompileResult output;
@@ -2074,7 +2115,7 @@ namespace bs
 
 				SHADER_DESC subShaderDesc;
 				Vector<String> subShaderIncludes;
-				BSLFXCompileResult subShaderOutput = compileShader(subShaderSource.str(), subShaderDefines, languages, 
+				BSLFXCompileResult subShaderOutput = compileShader(subShaderSource.str(), subShaderDefines, languages,
 					subShaderDesc, subShaderIncludes);
 
 				if (!subShaderOutput.errorMessage.empty())
@@ -2321,9 +2362,21 @@ namespace bs
 						R"(\[\s*layout\s*\(.*\)\s*\]|\[\s*internal\s*\]|\[\s*color\s*\]|\[\s*alias\s*\(.*\)\s*\]|\[\s*spriteuv\s*\(.*\)\s*\])");
 					hlslPassData.code = regex_replace(hlslPassData.code, attrRegex, "");
 
+					static const std::regex attr2Regex(
+						R"(\[\s*hideInInspector\s*\]|\[\s*name\s*\(".*"\)\s*\])");
+					hlslPassData.code = regex_replace(hlslPassData.code, attr2Regex, "");
+
 					static const std::regex initializerRegex(
 						R"(Texture2D\s*(\S*)\s*=.*;)");
 					hlslPassData.code = regex_replace(hlslPassData.code, initializerRegex, "Texture2D $1;");
+
+					static const std::regex warpWithSyncRegex(
+						R"(Warp(Group|Device|All)MemoryBarrierWithWarpSync)");
+					hlslPassData.code = regex_replace(hlslPassData.code, warpWithSyncRegex, "$1MemoryBarrierWithGroupSync");
+
+					static const std::regex warpNoSyncRegex(
+						R"(Warp(Group|Device|All)MemoryBarrier)");
+					hlslPassData.code = regex_replace(hlslPassData.code, warpNoSyncRegex, "$1MemoryBarrier");
 
 					// Note: I'm just copying HLSL code as-is. This code will contain all entry points which could have
 					// an effect on compile time. It would be ideal to remove dead code depending on program type. This would

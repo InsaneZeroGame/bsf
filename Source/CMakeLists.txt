@@ -1,7 +1,7 @@
 # Version
 set (BS_FRAMEWORK_VERSION_MAJOR 1)
 set (BS_FRAMEWORK_VERSION_MINOR 1)
-set (BS_FRAMEWORK_VERSION_PATCH 0) 
+set (BS_FRAMEWORK_VERSION_PATCH 0)
 set (BS_FRAMEWORK_CURRENT_RELEASE_YEAR 2019)
 
 set (BS_FRAMEWORK_PREBUILT_DEPENDENCIES_VERSION 11)
@@ -14,6 +14,8 @@ set_property(CACHE AUDIO_MODULE PROPERTY STRINGS OpenAudio FMOD Null)
 
 set(PHYSICS_MODULE "PhysX" CACHE STRING "Physics backend to use.")
 set_property(CACHE PHYSICS_MODULE PROPERTY STRINGS "PhysX" "Null")
+
+set(BSF_PLUGIN_IMGUI OFF CACHE BOOL "Add support for Imgui library through a plugin")
 
 if(WIN32)
 	set(RENDER_API_MODULE "DirectX 11" CACHE STRING "Render API to use.")
@@ -64,12 +66,12 @@ if(WIN32)
 		file (STRINGS ${SOURCE_DEP_BUILD_VERSION_FILE} CURRENT_SOURCE_DEP_VERSION)
 		if(${BS_FRAMEWORK_SRC_DEPENDENCIES_VERSION} GREATER ${CURRENT_SOURCE_DEP_VERSION})
 			message(STATUS "Built dependencies are out of date, forcing recompile.")
-			execute_process(COMMAND "${CMAKE_COMMAND}" 
+			execute_process(COMMAND "${CMAKE_COMMAND}"
 				-E remove_directory "${SOURCE_DEP_BUILD_DIR}")	
 		endif()
 	else()
 		message(STATUS "Built dependencies are out of date, forcing recompile.")
-		execute_process(COMMAND "${CMAKE_COMMAND}" 
+		execute_process(COMMAND "${CMAKE_COMMAND}"
 			-E remove_directory "${SOURCE_DEP_BUILD_DIR}")	
 	endif()
 endif()
@@ -201,6 +203,10 @@ else() # Otherwise include only chosen ones
 	endif()
 endif()
 
+if (BSF_PLUGIN_IMGUI)
+	include(CMake/Plugins/bsfImgui.cmake)
+endif()
+
 add_subdirectory(Plugins/bsfFBXImporter)
 add_subdirectory(Plugins/bsfFontImporter)
 add_subdirectory(Plugins/bsfFreeImgImporter)
@@ -210,17 +216,17 @@ add_subdirectory(Plugins/bsfSL)
 if(BUILD_TESTS)
 	enable_testing()
 
-	add_executable(UtilityTest 
-		Foundation/bsfUtility/Private/UnitTests/BsUtilityTest.cpp 
+	add_executable(UtilityTest
+		Foundation/bsfUtility/Private/UnitTests/BsUtilityTest.cpp
 		Foundation/bsfUtility/Private/UnitTests/BsUtilityTestSuite.cpp
 		Foundation/bsfUtility/Private/UnitTests/BsFileSystemTestSuite.cpp)
 		
 	target_link_libraries(UtilityTest bsf)
-	target_include_directories(UtilityTest PRIVATE 
+	target_include_directories(UtilityTest PRIVATE
 		"Foundation/bsfUtility"
 		"Foundation/bsfUtility/ThirdParty")
 
-	add_executable(CoreTest 
+	add_executable(CoreTest
 		Foundation/bsfCore/Private/UnitTests/BsCoreTest.cpp)
 		
 	target_link_libraries(CoreTest bsf)
@@ -236,6 +242,7 @@ endif()
 add_executable(bsfImportTool
 	Foundation/bsfEngine/Resources/BsBuiltinResourcesImporter.cpp)
 add_common_flags(bsfImportTool)
+target_compile_definitions(bsfImportTool PRIVATE -DBS_IS_ASSET_TOOL)
 
 target_link_libraries(bsfImportTool bsf)
 	

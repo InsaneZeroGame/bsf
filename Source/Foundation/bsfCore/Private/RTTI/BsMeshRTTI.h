@@ -27,18 +27,18 @@ namespace bs
 			BS_RTTI_MEMBER_REFLPTR(mMorphShapes, 5)
 		BS_END_RTTI_MEMBERS
 
-		SPtr<MeshData> getMeshData(Mesh* obj) 
-		{ 
+		SPtr<MeshData> getMeshData(Mesh* obj)
+		{
 			SPtr<MeshData> meshData = obj->allocBuffer();
 
 			obj->readData(meshData);
-			gCoreThread().submitAll(true);
+			gCoreThread().submit(true);
 
 			return meshData;
 		}
 
-		void setMeshData(Mesh* obj, SPtr<MeshData> meshData) 
-		{ 
+		void setMeshData(Mesh* obj, SPtr<MeshData> meshData)
+		{
 			obj->mCPUData = meshData;
 		}
 

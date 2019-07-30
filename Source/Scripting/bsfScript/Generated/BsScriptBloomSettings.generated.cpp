@@ -26,12 +26,14 @@ namespace bs
 		metaData.scriptClass->addInternalCall("Internal_setintensity", (void*)&ScriptBloomSettings::Internal_setintensity);
 		metaData.scriptClass->addInternalCall("Internal_gettint", (void*)&ScriptBloomSettings::Internal_gettint);
 		metaData.scriptClass->addInternalCall("Internal_settint", (void*)&ScriptBloomSettings::Internal_settint);
+		metaData.scriptClass->addInternalCall("Internal_getfilterSize", (void*)&ScriptBloomSettings::Internal_getfilterSize);
+		metaData.scriptClass->addInternalCall("Internal_setfilterSize", (void*)&ScriptBloomSettings::Internal_setfilterSize);
 
 	}
 
 	MonoObject* ScriptBloomSettings::create(const SPtr<BloomSettings>& value)
 	{
-		if(value == nullptr) return nullptr; 
+		if(value == nullptr) return nullptr;
 
 		bool dummy = false;
 		void* ctorParams[1] = { &dummy };
@@ -123,5 +125,21 @@ namespace bs
 	void ScriptBloomSettings::Internal_settint(ScriptBloomSettings* thisPtr, Color* value)
 	{
 		thisPtr->getInternal()->tint = *value;
+	}
+
+	float ScriptBloomSettings::Internal_getfilterSize(ScriptBloomSettings* thisPtr)
+	{
+		float tmp__output;
+		tmp__output = thisPtr->getInternal()->filterSize;
+
+		float __output;
+		__output = tmp__output;
+
+		return __output;
+	}
+
+	void ScriptBloomSettings::Internal_setfilterSize(ScriptBloomSettings* thisPtr, float value)
+	{
+		thisPtr->getInternal()->filterSize = value;
 	}
 }

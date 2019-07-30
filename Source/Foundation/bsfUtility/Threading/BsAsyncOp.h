@@ -25,7 +25,7 @@ namespace bs
 	};
 
 	/**
-	 * Flag used for creating async operations signaling that we want to create an empty AsyncOp with no internal 
+	 * Flag used for creating async operations signaling that we want to create an empty AsyncOp with no internal
 	 * memory storage.
 	 */
 	struct BS_UTILITY_EXPORT AsyncOpEmpty {};
@@ -75,14 +75,14 @@ namespace bs
 		 * Blocks the caller thread until the AsyncOp completes.
 		 *
 		 * @note
-		 * Do not call this on the thread that is completing the async op, as it will cause a deadlock. Make sure the 
+		 * Do not call this on the thread that is completing the async op, as it will cause a deadlock. Make sure the
 		 * command you are waiting for is actually queued for execution because a deadlock will occur otherwise.
 		 */
 		void blockUntilComplete() const
 		{
 			if (mSyncData == nullptr)
 			{
-				LOGERR("No sync data is available. Cannot block until AsyncOp is complete.");
+				BS_LOG(Error, Generic, "No sync data is available. Cannot block until AsyncOp is complete.");
 				return;
 			}
 
@@ -91,15 +91,15 @@ namespace bs
 				mSyncData->mCondition.wait(lock);
 		}
 
-		/** 
-		* Retrieves the value returned by the async operation as a generic type. Only valid if hasCompleted() returns 
-		* true. 
+		/**
+		* Retrieves the value returned by the async operation as a generic type. Only valid if hasCompleted() returns
+		* true.
 		*/
 		Any getGenericReturnValue() const
 		{
 #if BS_DEBUG_MODE
 			if(!hasCompleted())
-				LOGERR("Trying to get AsyncOp return value but the operation hasn't completed.");
+				BS_LOG(Error, Generic, "Trying to get AsyncOp return value but the operation hasn't completed.");
 #endif
 
 			return mData->mReturnValue;
@@ -111,15 +111,11 @@ namespace bs
 	};
 
 	/**
-	 * Object you may use to check on the results of an asynchronous operation. Contains uninitialized data until 
-	 * hasCompleted() returns true. 
-	 * 			
+	 * Object you may use to check on the results of an asynchronous operation. Contains uninitialized data until
+	 * hasCompleted() returns true.
+	 *
 	 * @note	
 	 * You are allowed (and meant to) to copy this by value.
-	 * @note
-	 * You'll notice mIsCompleted isn't synchronized. This is because we're okay if mIsCompleted reports true a few cycles 
-	 * too late, which is not relevant for practical use. And in cases where you need to ensure operation has completed 
-	 * you will usually use some kind of synchronization primitive that includes a memory barrier anyway.
 	 */
 	template<class ReturnType>
 	class BS_UTILITY_EXPORT TAsyncOp : public AsyncOpBase
@@ -142,18 +138,18 @@ namespace bs
 		{ }
 
 		/** Retrieves the value returned by the async operation. Only valid if hasCompleted() returns true. */
-		ReturnType getReturnValue() const 
-		{ 
+		ReturnType getReturnValue() const
+		{
 #if BS_DEBUG_MODE
 			if(!hasCompleted())
-				LOGERR("Trying to get AsyncOp return value but the operation hasn't completed.");
+				BS_LOG(Error, Generic, "Trying to get AsyncOp return value but the operation hasn't completed.");
 #endif
 
 			return any_cast<ReturnType>(mData->mReturnValue);
 		}
 
 	public: // ***** INTERNAL ******
-		/** @name Internal 
+		/** @name Internal
 		 *  @{
 		 */
 

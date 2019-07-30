@@ -48,6 +48,26 @@
 
 namespace bs
 {
+	BS_LOG_CATEGORY_IMPL(CoreThread)
+	BS_LOG_CATEGORY_IMPL(Renderer)
+	BS_LOG_CATEGORY_IMPL(Scene)
+	BS_LOG_CATEGORY_IMPL(Physics)
+	BS_LOG_CATEGORY_IMPL(Audio)
+	BS_LOG_CATEGORY_IMPL(RenderBackend)
+	BS_LOG_CATEGORY_IMPL(BSLCompiler)
+	BS_LOG_CATEGORY_IMPL(Particles)
+	BS_LOG_CATEGORY_IMPL(Resources)
+	BS_LOG_CATEGORY_IMPL(FBXImporter)
+	BS_LOG_CATEGORY_IMPL(PixelUtility)
+	BS_LOG_CATEGORY_IMPL(Texture)
+	BS_LOG_CATEGORY_IMPL(Mesh)
+	BS_LOG_CATEGORY_IMPL(GUI)
+	BS_LOG_CATEGORY_IMPL(Profiler)
+	BS_LOG_CATEGORY_IMPL(Material)
+	BS_LOG_CATEGORY_IMPL(FreeImageImporter)
+	BS_LOG_CATEGORY_IMPL(Script)
+	BS_LOG_CATEGORY_IMPL(Importer)
+
 	CoreApplication::CoreApplication(START_UP_DESC desc)
 		: mPrimaryWindow(nullptr), mStartUpDesc(desc), mRendererPlugin(nullptr), mIsFrameRenderingFinished(true)
 		, mSimThreadId(BS_THREAD_CURRENT_ID), mRunMainLoop(false)
@@ -133,7 +153,6 @@ namespace bs
 		ProfilingManager::startUp();
 		ThreadPool::startUp<TThreadPool<ThreadDefaultPolicy>>((numWorkerThreads));
 		TaskScheduler::startUp();
-		TaskScheduler::instance().removeWorker();
 		RenderStats::startUp();
 		CoreThread::startUp();
 		StringTableManager::startUp();
@@ -201,8 +220,8 @@ namespace bs
 					}
 					else
 					{
-						// Otherwise we just spin, sleep timer granularity is too low and we might end up wasting a 
-						// millisecond otherwise. 
+						// Otherwise we just spin, sleep timer granularity is too low and we might end up wasting a
+						// millisecond otherwise.
 						// Note: For mobiles where power might be more important than input latency, consider using sleep.
 						while(nextFrameTime > currentTime)
 							currentTime = gTime().getTimePrecise();
@@ -222,7 +241,7 @@ namespace bs
 			// so that all input is properly captured in case there is a focus change, and so that
 			// focus change is registered before input events are sent out (mouse press can result in code
 			// checking if a window is in focus, so it has to be up to date)
-			RenderWindowManager::instance()._update(); 
+			RenderWindowManager::instance()._update();
 			gInput()._triggerCallbacks();
 			gDebug()._triggerCallbacks();
 
@@ -271,9 +290,9 @@ namespace bs
 			gSceneManager()._updateCoreObjectTransforms();
 			PROFILE_CALL(RendererManager::instance().getActive()->renderAll(perFrameData), "Render");
 
-			// Core and sim thread run in lockstep. This will result in a larger input latency than if I was 
-			// running just a single thread. Latency becomes worse if the core thread takes longer than sim 
-			// thread, in which case sim thread needs to wait. Optimal solution would be to get an average 
+			// Core and sim thread run in lockstep. This will result in a larger input latency than if I was
+			// running just a single thread. Latency becomes worse if the core thread takes longer than sim
+			// thread, in which case sim thread needs to wait. Optimal solution would be to get an average
 			// difference between sim/core thread and start the sim thread a bit later so they finish at nearly the same time.
 			{
 				Lock lock(mFrameRenderingFinishedMutex);
@@ -292,8 +311,8 @@ namespace bs
 			gCoreThread().queueCommand(&Platform::_coreUpdate, CTQF_InternalQueue);
 			gCoreThread().queueCommand(std::bind(&ct::RenderWindowManager::_update, ct::RenderWindowManager::instancePtr()), CTQF_InternalQueue);
 
-			gCoreThread().update(); 
-			gCoreThread().submitAll(); 
+			gCoreThread().update();
+			gCoreThread().submitAll();
 
 			gCoreThread().queueCommand(std::bind(&CoreApplication::frameRenderingFinishedCallback, this), CTQF_InternalQueue);
 
@@ -366,15 +385,19 @@ namespace bs
 
 	void CoreApplication::beginCoreProfiling()
 	{
+#if !BS_FORCE_SINGLETHREADED_RENDERING
 		gProfilerCPU().beginThread("Core");
+#endif
 	}
 
 	void CoreApplication::endCoreProfiling()
 	{
 		ProfilerGPU::instance()._update();
 
+#if !BS_FORCE_SINGLETHREADED_RENDERING
 		gProfilerCPU().endThread();
 		gProfiler()._updateCore();
+#endif
 	}
 
 	void* CoreApplication::loadPlugin(const String& pluginName, DynLib** library, void* passThrough)

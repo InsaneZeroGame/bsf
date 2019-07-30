@@ -55,7 +55,7 @@ namespace bs
 	{
 		if (nearPlane <= 0)
 		{
-			LOGERR("Near clip distance must be greater than zero.");
+			BS_LOG(Error, Renderer, "Near clip distance must be greater than zero.");
 			return;
 		}
 
@@ -571,7 +571,12 @@ namespace bs
 
 		Vector2I screenPoint;
 		screenPoint.x = Math::roundToInt(viewport.x + ((ndcPoint.x + 1.0f) * 0.5f) * viewport.width);
-		screenPoint.y = Math::roundToInt(viewport.y + (1.0f - (ndcPoint.y + 1.0f) * 0.5f) * viewport.height);
+
+		const Conventions& rapiConventions = ct::gCaps().conventions;
+		if(rapiConventions.ndcYAxis == Conventions::Axis::Down)
+			screenPoint.y = Math::roundToInt(viewport.y + (ndcPoint.y + 1.0f) * 0.5f * viewport.height);
+		else
+			screenPoint.y = Math::roundToInt(viewport.y + (1.0f - (ndcPoint.y + 1.0f) * 0.5f) * viewport.height);
 
 		return screenPoint;
 	}

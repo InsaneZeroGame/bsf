@@ -85,6 +85,7 @@ namespace bs
 	};
 
 	/** @} */
+
 }
 
 /** @cond STDLIB */

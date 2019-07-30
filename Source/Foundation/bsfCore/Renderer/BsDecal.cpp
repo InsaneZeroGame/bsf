@@ -26,7 +26,7 @@ namespace bs
 
 		if (!isPow2)
 		{
-			LOGWRN("Invalid layer provided. Only one layer bit may be set. Ignoring.");
+			BS_LOG(Warning, Renderer, "Invalid layer provided. Only one layer bit may be set. Ignoring.");
 			return;
 		}
 
@@ -114,6 +114,12 @@ namespace bs
 		decalPtr->_setThisPtr(decalPtr);
 
 		return decalPtr;
+	}
+
+	void Decal::getCoreDependencies(Vector<CoreObject*>& dependencies)
+	{
+		if (mMaterial.isLoaded())
+			dependencies.push_back(mMaterial.get());
 	}
 
 	CoreSyncData Decal::syncToCore(FrameAlloc* allocator)

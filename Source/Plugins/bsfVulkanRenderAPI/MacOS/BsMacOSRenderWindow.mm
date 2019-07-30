@@ -68,6 +68,9 @@ namespace bs
 		if(props.isHidden)
 			mWindow->hide();
 
+		CAMetalLayer* layer = [[CAMetalLayer alloc] init];
+		mWindow->_setLayer((__bridge void *)layer);
+
 		{
 			ScopedSpinLock lock(getCore()->mLock);
 			getCore()->mSyncedProperties = props;
@@ -224,7 +227,7 @@ namespace bs
 		UINT32 outputIdx = videoMode.outputIdx;
 		if(outputIdx >= videoModeInfo.getNumOutputs())
 		{
-			LOGERR("Invalid output device index.")
+			BS_LOG(Error, Platform, "Invalid output device index.");
 			return;
 		}
 
@@ -252,7 +255,7 @@ namespace bs
 
 			if (foundMode == (UINT32)-1)
 			{
-				LOGERR("Unable to enter fullscreen, unsupported video mode requested.");
+				BS_LOG(Error, Platform, "Unable to enter fullscreen, unsupported video mode requested.");
 				return;
 			}
 
@@ -294,7 +297,7 @@ namespace bs
 		UINT32 outputIdx = 0; // 0 is always primary
 		if(outputIdx >= videoModeInfo.getNumOutputs())
 		{
-			LOGERR("Invalid output device index.")
+			BS_LOG(Error, Platform, "Invalid output device index.");
 			return;
 		}
 
@@ -429,15 +432,12 @@ namespace bs
 				return;
 			}
 
-			CAMetalLayer* layer = [[CAMetalLayer alloc] init];
-			window->_setLayer((__bridge void *)layer);
-
 			// Create Vulkan surface
 			VkMacOSSurfaceCreateInfoMVK surfaceCreateInfo;
 			surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_MACOS_SURFACE_CREATE_INFO_MVK;
 			surfaceCreateInfo.pNext = nullptr;
 			surfaceCreateInfo.flags = 0;
-			surfaceCreateInfo.pView = (__bridge const void *)(layer);
+			surfaceCreateInfo.pView = window->_getLayer();
 
 			VkResult result = vkCreateMacOSSurfaceMVK(mRenderAPI._getInstance(), &surfaceCreateInfo,
 					bs::ct::gVulkanAllocator, &mSurface);

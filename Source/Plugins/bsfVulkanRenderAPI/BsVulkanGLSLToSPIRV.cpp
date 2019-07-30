@@ -126,7 +126,7 @@ namespace bs { namespace ct
 
 	VertexElementType mapGLSLangToVertexElemType(const glslang::TType& type)
 	{
-		if (type.isVector()) 
+		if (type.isVector())
 		{
 			UINT32 vectorSize = type.getVectorSize();
 
@@ -156,14 +156,14 @@ namespace bs { namespace ct
 				case 4:		return VET_UINT4;
 				default:	return VET_UNKNOWN;
 				}
-			default:            
+			default:
 				return VET_UNKNOWN;
 			}
 		}
 
-		if (type.getVectorSize() == 1) 
+		if (type.getVectorSize() == 1)
 		{
-			switch (type.getBasicType()) 
+			switch (type.getBasicType())
 			{
 				case glslang::EbtFloat:      return VET_FLOAT1;
 				case glslang::EbtInt:        return VET_INT1;
@@ -210,20 +210,20 @@ namespace bs { namespace ct
 				case 4:		return GPDT_INT4;
 				default:	return GPDT_UNKNOWN;
 				}
-			default:        
+			default:
 				return GPDT_UNKNOWN;
 			}
 		}
 
-		if (type.isMatrix()) 
+		if (type.isMatrix())
 		{
-			switch (type.getBasicType()) 
+			switch (type.getBasicType())
 			{
 			case glslang::EbtFloat:
-				switch (type.getMatrixCols()) 
+				switch (type.getMatrixCols())
 				{
 				case 2:
-					switch (type.getMatrixRows()) 
+					switch (type.getMatrixRows())
 					{
 						case 2:    return GPDT_MATRIX_2X2;
 						case 3:    return GPDT_MATRIX_3X2;
@@ -231,7 +231,7 @@ namespace bs { namespace ct
 						default:   return GPDT_UNKNOWN;
 					}
 				case 3:
-					switch (type.getMatrixRows()) 
+					switch (type.getMatrixRows())
 					{
 						case 2:    return GPDT_MATRIX_2X3;
 						case 3:    return GPDT_MATRIX_3X3;
@@ -239,7 +239,7 @@ namespace bs { namespace ct
 						default:   return GPDT_UNKNOWN;
 					}
 				case 4:
-					switch (type.getMatrixRows()) 
+					switch (type.getMatrixRows())
 					{
 						case 2:    return GPDT_MATRIX_2X4;
 						case 3:    return GPDT_MATRIX_3X4;
@@ -267,6 +267,83 @@ namespace bs { namespace ct
 		}
 
 		return GPDT_UNKNOWN;
+	}
+
+	GpuBufferFormat mapSamplerBasicType(const glslang::TSampler& sampler)
+	{
+		UINT32 vectorSize = sampler.vectorSize;
+		switch (sampler.type)
+		{
+		case glslang::EbtFloat:
+			switch (vectorSize)
+			{
+			case 1:		return BF_32X1F;
+			case 2:		return BF_32X2F;
+			case 3:		return BF_32X3F;
+			case 4:		return BF_32X4F;
+			default:	return BF_UNKNOWN;
+			}
+		case glslang::EbtFloat16:
+			switch (vectorSize)
+			{
+			case 1:		return BF_16X1F;
+			case 2:		return BF_16X2F;
+			case 4:		return BF_16X4F;
+			default:	return BF_UNKNOWN;
+			}
+		case glslang::EbtInt16:
+			switch (vectorSize)
+			{
+			case 1:		return BF_16X1U;
+			case 2:		return BF_16X2U;
+			case 4:		return BF_16X4U;
+			default:	return BF_UNKNOWN;
+			}
+		case glslang::EbtUint16:
+			switch (vectorSize)
+			{
+			case 1:		return BF_16X1S;
+			case 2:		return BF_16X2S;
+			case 4:		return BF_16X4S;
+			default:	return BF_UNKNOWN;
+			}
+		case glslang::EbtInt8:
+			switch (vectorSize)
+			{
+			case 1:		return BF_8X1U;
+			case 2:		return BF_8X2U;
+			case 4:		return BF_8X4U;
+			default:	return BF_UNKNOWN;
+			}
+		case glslang::EbtUint8:
+			switch (vectorSize)
+			{
+			case 1:		return BF_8X1S;
+			case 2:		return BF_8X2S;
+			case 4:		return BF_8X4S;
+			default:	return BF_UNKNOWN;
+			}
+		case glslang::EbtInt:
+			switch (vectorSize)
+			{
+			case 1:		return BF_32X1S;
+			case 2:		return BF_32X2S;
+			case 3:		return BF_32X3S;
+			case 4:		return BF_32X4S;
+			default:	return BF_UNKNOWN;
+			}
+		case glslang::EbtUint:
+			switch (vectorSize)
+			{
+			case 1:		return BF_32X1U;
+			case 2:		return BF_32X2U;
+			case 3:		return BF_32X3U;
+			case 4:		return BF_32X4U;
+			default:	return BF_UNKNOWN;
+			}
+		default:
+			return BF_UNKNOWN;
+		}
 	}
 
 	/**	Holds a GLSL program input attribute used in vertex programs. */
@@ -361,7 +438,8 @@ namespace bs { namespace ct
 			{
 				VertexElementType type = mapGLSLangToVertexElemType(*ttype);
 				if (type == VET_UNKNOWN)
-					LOGERR("Cannot determine vertex input attribute type for attribute: " + String(attribName));
+					BS_LOG(Error, RenderBackend, "Cannot determine vertex input attribute type for attribute: {0}",
+						attribName);
 
 				elementList.push_back(VertexElement(0, location, type, semantic, index));
 			}
@@ -369,7 +447,10 @@ namespace bs { namespace ct
 			{
 				// Ignore built-in attributes
 				if (memcmp(attribName, "gl_", 3) != 0)
-					LOGERR("Cannot determine vertex input attribute semantic for attribute: " + String(attribName));
+				{
+					BS_LOG(Error, RenderBackend, "Cannot determine vertex input attribute semantic for attribute: {0}",
+						attribName);
+				}
 			}
 		}
 
@@ -396,7 +477,7 @@ namespace bs { namespace ct
 				GpuParamDataType paramType = mapGLSLangToGpuParamDataType(*ttype);
 				if (paramType == GPDT_UNKNOWN)
 				{
-					LOGWRN("Cannot determine type for uniform inside a struct.");
+					BS_LOG(Warning, RenderBackend, "Cannot determine type for uniform inside a struct.");
 					continue;
 				}
 
@@ -444,6 +525,7 @@ namespace bs { namespace ct
 				param.slot = qualifier.layoutBinding;
 				param.set = qualifier.layoutSet;
 				param.type = GPOT_UNKNOWN;
+				param.elementType = mapSamplerBasicType(sampler);
 
 				if (param.set == glslang::TQualifier::layoutSetEnd)
 					param.set = 0;
@@ -455,7 +537,7 @@ namespace bs { namespace ct
 					case glslang::Esd1D:		param.type = sampler.isArrayed() ? GPOT_RWTEXTURE1DARRAY : GPOT_RWTEXTURE1D; break;
 					case glslang::Esd2D:
 						if(sampler.isArrayed())
-							param.type = sampler.isMultiSample() ? GPOT_RWTEXTURE2DMSARRAY : GPOT_RWTEXTURE2DARRAY; 
+							param.type = sampler.isMultiSample() ? GPOT_RWTEXTURE2DMSARRAY : GPOT_RWTEXTURE2DARRAY;
 						else
 							param.type = sampler.isMultiSample() ? GPOT_RWTEXTURE2DMS : GPOT_RWTEXTURE2D;
 						break;
@@ -493,7 +575,7 @@ namespace bs { namespace ct
 						case glslang::Esd1D:		param.type = sampler.isArrayed() ? GPOT_TEXTURE1DARRAY : GPOT_TEXTURE1D; break;
 						case glslang::Esd2D:
 							if(sampler.isArrayed())
-								param.type = sampler.isMultiSample() ? GPOT_TEXTURE2DMSARRAY : GPOT_TEXTURE2DARRAY; 
+								param.type = sampler.isMultiSample() ? GPOT_TEXTURE2DMSARRAY : GPOT_TEXTURE2DARRAY;
 							else
 								param.type = sampler.isMultiSample() ? GPOT_TEXTURE2DMS : GPOT_TEXTURE2D;
 							break;
@@ -512,7 +594,7 @@ namespace bs { namespace ct
 				}
 
 				if(param.type == GPOT_UNKNOWN)
-					LOGERR("Cannot determine type for uniform: " + String(name));
+					BS_LOG(Error, RenderBackend, "Cannot determine type for uniform: {0}", name);
 			}
 			else
 			{
@@ -603,7 +685,7 @@ namespace bs { namespace ct
 
 					if (paramType == GPDT_UNKNOWN)
 					{
-						LOGWRN("Cannot determine type for uniform: " + String(name));
+						BS_LOG(Warning, RenderBackend, "Cannot determine type for uniform: {0}", name);
 						continue;
 					}
 
@@ -719,6 +801,7 @@ namespace bs { namespace ct
 		const char* sourceBytes = source.c_str();
 
 		glslang::TShader* shader = bs_new<glslang::TShader>(glslType);
+		shader->setEnvTarget(glslang::EShTargetSpv, glslang::EShTargetSpv_1_3);
 		shader->setStrings(&sourceBytes, 1);
 		shader->setEntryPoint("main");
 

@@ -186,6 +186,12 @@
 #define BS_MAX_MULTIPLE_RENDER_TARGETS 8
 #define BS_FORCE_SINGLETHREADED_RENDERING 0
 
+/**
+ * Runs the core thead on the application's main (initial) thread, rather than on a separate worker. Important for macOS
+ * which has limitations regarding what can run on non-main threads.
+ */
+#define BS_CORE_THREAD_IS_MAIN 0
+
 /** Maximum number of individual GPU queues, per type. */
 #define BS_MAX_QUEUES_PER_TYPE 8
 
@@ -227,7 +233,7 @@
 #include "Localization/BsHString.h"
 #include "String/BsStringID.h"
 
-namespace bs 
+namespace bs
 {
 	// Core objects
 	template<class T>
@@ -641,6 +647,7 @@ namespace bs
 		TID_RenderWindow = 1195,
 		TID_ShaderVariationParamInfo = 1196,
 		TID_ShaderVariationParamValue = 1197,
+		TID_ScreenSpaceLensFlareSettings = 1198,
 
 		// Moved from Engine layer
 		TID_CCamera = 30000,
@@ -791,9 +798,9 @@ namespace bs
 
 	template<class T> struct CoreVariant<T, true> { typedef typename CoreThreadType<T>::Type Type; };
 
-	/** 
-	 * Allows a simple way to define a member that can be both CoreObject variants depending on the Core template 
-	 * parameter. 
+	/**
+	 * Allows a simple way to define a member that can be both CoreObject variants depending on the Core template
+	 * parameter.
 	 */
 	template<class T, bool Core>
 	using CoreVariantType = typename CoreVariant<T, Core>::Type;
@@ -806,10 +813,10 @@ namespace bs
 
 	template<class T> struct CoreVariantHandle<T, true> { typedef SPtr<typename CoreThreadType<T>::Type> Type; };
 
-	/** 
-	 * Allows a simple way to define a member that can be both CoreObject variants depending on the Core template 
-	 * parameter. Sim thread type is wrapped in as a resource handle while the core thread variant is wrapped in a shared 
-	 * pointer. 
+	/**
+	 * Allows a simple way to define a member that can be both CoreObject variants depending on the Core template
+	 * parameter. Sim thread type is wrapped in as a resource handle while the core thread variant is wrapped in a shared
+	 * pointer.
 	 */
 	template<class T, bool Core>
 	using CoreVariantHandleType = typename CoreVariantHandle<T, Core>::Type;
@@ -817,7 +824,7 @@ namespace bs
 	/** Flags that are provided to the serialization system to control serialization/deserialization. */
 	enum SerializationFlags
 	{
-		/** 
+		/**
 		 * Used when deserializing resources. Lets the system know not to discard any intermediate resource data that might
 		 * be required if the resource needs to be serialized.
 		 */
@@ -866,6 +873,26 @@ namespace bs
 		GameObjectHandle<ComponentType> mComponent;
 		SPtr<T> mActor;
 	};
+
+	BS_LOG_CATEGORY(CoreThread, 20)
+	BS_LOG_CATEGORY(Renderer, 21)
+	BS_LOG_CATEGORY(Scene, 22)
+	BS_LOG_CATEGORY(Physics, 23)
+	BS_LOG_CATEGORY(Audio, 24)
+	BS_LOG_CATEGORY(RenderBackend, 25)
+	BS_LOG_CATEGORY(BSLCompiler, 26)
+	BS_LOG_CATEGORY(Particles, 27)
+	BS_LOG_CATEGORY(Resources, 28)
+	BS_LOG_CATEGORY(FBXImporter, 29)
+	BS_LOG_CATEGORY(PixelUtility, 30)
+	BS_LOG_CATEGORY(Texture, 31)
+	BS_LOG_CATEGORY(Mesh, 32)
+	BS_LOG_CATEGORY(GUI, 33)
+	BS_LOG_CATEGORY(Profiler, 34)
+	BS_LOG_CATEGORY(Material, 35)
+	BS_LOG_CATEGORY(FreeImageImporter, 36)
+	BS_LOG_CATEGORY(Script, 37)
+	BS_LOG_CATEGORY(Importer, 38)
 }
 
 #include "Utility/BsCommonTypes.h"

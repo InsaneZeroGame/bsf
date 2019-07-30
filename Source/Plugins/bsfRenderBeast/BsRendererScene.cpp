@@ -23,7 +23,7 @@ namespace bs {	namespace ct
 {
 	PerFrameParamDef gPerFrameParamDef;
 
-	static const ShaderVariation* DECAL_VAR_LOOKUP[2][3] = 
+	static const ShaderVariation* DECAL_VAR_LOOKUP[2][3] =
 	{
 		{
 			&getDecalShaderVariation<false, MSAAMode::None>(),
@@ -76,8 +76,8 @@ namespace bs {	namespace ct
 		UINT32 cameraId = camera->getRendererId();
 		RendererView* view = mInfo.views[cameraId];
 
-		UINT32 updateEverythingFlag = (UINT32)ActorDirtyFlag::Everything 
-			| (UINT32)ActorDirtyFlag::Active 
+		UINT32 updateEverythingFlag = (UINT32)ActorDirtyFlag::Everything
+			| (UINT32)ActorDirtyFlag::Active
 			| (UINT32)CameraDirtyFlag::Viewport;
 
 		if((updateFlag & updateEverythingFlag) != 0)
@@ -372,7 +372,7 @@ namespace bs {	namespace ct
 								for (auto& entry : missingElements)
 									wrnStream << "\t" << toString(entry.getSemantic()) << entry.getSemanticIdx() << std::endl;
 
-								LOGWRN(wrnStream.str());
+								BS_LOG(Warning, Renderer, wrnStream.str());
 								break;
 							}
 						}
@@ -395,13 +395,13 @@ namespace bs {	namespace ct
 			SPtr<Shader> shader = element.material->getShader();
 			if (shader == nullptr)
 			{
-				LOGWRN("Missing shader on material.");
+				BS_LOG(Warning, Renderer, "Missing shader on material.");
 				continue;
 			}
 
 			SPtr<GpuParams> gpuParams = element.params->getGpuParams();
 
-			// Note: Perhaps perform buffer validation to ensure expected buffer has the same size and layout as the 
+			// Note: Perhaps perform buffer validation to ensure expected buffer has the same size and layout as the
 			// provided buffer, and show a warning otherwise. But this is perhaps better handled on a higher level.
 			gpuParams->setParamBlockBuffer("PerFrame", mPerFrameParamBuffer);
 			gpuParams->setParamBlockBuffer("PerObject", rendererRenderable->perObjectParamBuffer);
@@ -500,7 +500,7 @@ namespace bs {	namespace ct
 
 		if(probeInfo.arrayIdx > MaxReflectionCubemaps)
 		{
-			LOGERR("Reached the maximum number of allowed reflection probe cubemaps at once. "
+			BS_LOG(Error, Renderer, "Reached the maximum number of allowed reflection probe cubemaps at once. "
 				"Ignoring reflection probe data.");
 		}
 	}
@@ -709,8 +709,8 @@ namespace bs {	namespace ct
 		ParticleForwardLightingType forwardLightingType;
 		if(requiresForwardLighting)
 		{
-			forwardLightingType = supportsClusteredForward 
-				? ParticleForwardLightingType::Clustered 
+			forwardLightingType = supportsClusteredForward
+				? ParticleForwardLightingType::Clustered
 				: ParticleForwardLightingType::Standard;
 		}
 		else
@@ -786,7 +786,7 @@ namespace bs {	namespace ct
 			rendererParticles.gpuParticlesParamBuffer = nullptr;
 		}
 
-		// Note: Perhaps perform buffer validation to ensure expected buffer has the same size and layout as the 
+		// Note: Perhaps perform buffer validation to ensure expected buffer has the same size and layout as the
 		// provided buffer, and show a warning otherwise. But this is perhaps better handled on a higher level.
 		gpuParams->setParamBlockBuffer("ParticleParams", rendererParticles.particlesParamBuffer);
 		gpuParams->setParamBlockBuffer("PerObject", rendererParticles.perObjectParamBuffer);
@@ -960,7 +960,10 @@ namespace bs {	namespace ct
 				findDesc.variation = DECAL_VAR_LOOKUP[i][j];
 				findDesc.override = true;
 
-				const UINT32 techniqueIdx = renElement.material->findTechnique(findDesc);
+				UINT32 techniqueIdx = renElement.material->findTechnique(findDesc);
+				if(techniqueIdx == (UINT32)-1)
+					techniqueIdx = 0;
+
 				const SPtr<Technique>& technique = renElement.material->getTechnique(techniqueIdx);
 				if (technique)
 					technique->compile();
@@ -982,7 +985,7 @@ namespace bs {	namespace ct
 		// Prepare all parameter bindings
 		SPtr<GpuParams> gpuParams = renElement.params->getGpuParams();
 
-		// Note: Perhaps perform buffer validation to ensure expected buffer has the same size and layout as the 
+		// Note: Perhaps perform buffer validation to ensure expected buffer has the same size and layout as the
 		// provided buffer, and show a warning otherwise. But this is perhaps better handled on a higher level.
 		gpuParams->setParamBlockBuffer("PerFrame", mPerFrameParamBuffer);
 		gpuParams->setParamBlockBuffer("DecalParams", rendererDecal.decalParamBuffer);

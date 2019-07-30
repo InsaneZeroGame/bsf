@@ -10,7 +10,7 @@
 namespace bs
 {
 	AnimationClipInfo::AnimationClipInfo(const HAnimationClip& clip)
-		: clip(clip) 
+		: clip(clip)
 	{ }
 
 	AnimationProxy::AnimationProxy(UINT64 id)
@@ -740,7 +740,8 @@ namespace bs
 	{
 		if(clip != nullptr && !clip->isAdditive())
 		{
-			LOGWRN("blendAdditive() called with a clip that doesn't contain additive animation. Ignoring.");
+			BS_LOG(Warning, Renderer,
+				"blendAdditive() called with a clip that doesn't contain additive animation. Ignoring.");
 
 			// Stop any clips on this layer, even if invalid
 			HAnimationClip nullClip;
@@ -1214,7 +1215,7 @@ namespace bs
 			{
 				for (auto& event : events)
 				{
-					if (event.time >= wrappedStart && (event.time < wrappedEnd || 
+					if (event.time >= wrappedStart && (event.time < wrappedEnd ||
 						(event.time == clipLength && start < clipLength && end >= clipLength)))
 						onEventTriggered(clipInfo.clip, event.name);
 				}

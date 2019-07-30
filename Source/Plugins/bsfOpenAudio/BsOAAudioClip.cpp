@@ -44,8 +44,8 @@ namespace bs
 			}
 
 			// Load decompressed data into a sound buffer
-			bool loadDecompressed = 
-				mDesc.readMode == AudioReadMode::LoadDecompressed || 
+			bool loadDecompressed =
+				mDesc.readMode == AudioReadMode::LoadDecompressed ||
 				(mDesc.readMode == AudioReadMode::LoadCompressed && mDesc.format == AudioFormat::PCM);
 
 			if(loadDecompressed)
@@ -71,7 +71,7 @@ namespace bs
 					if (reader.open(stream, info, offset))
 						reader.read(sampleBuffer, info.numSamples);
 					else
-						LOGERR("Failed decompressing AudioClip stream.");
+						BS_LOG(Error, Audio, "Failed decompressing AudioClip stream.");
 				}
 				// Load directly
 				else
@@ -93,7 +93,7 @@ namespace bs
 			else if(mDesc.readMode == AudioReadMode::LoadCompressed)
 			{
 				// If reading from file, make a copy of data in memory, otherwise just take ownership of the existing buffer
-				if (mStreamData->isFile()) 
+				if (mStreamData->isFile())
 				{
 					if (mSourceStreamData != nullptr) // If it's already loaded in memory, use it directly
 						mStreamData = mSourceStreamData;
@@ -123,7 +123,7 @@ namespace bs
 				if (mStreamData != nullptr)
 				{
 					if (!mVorbisReader.open(mStreamData, info, mStreamOffset))
-						LOGERR("Failed decompressing AudioClip stream.");
+						BS_LOG(Error, Audio, "Failed decompressing AudioClip stream.");
 				}
 			}
 		}
@@ -169,7 +169,7 @@ namespace bs
 			return;
 		}
 
-		LOGWRN("Attempting to read samples while sample data is not available.");
+		BS_LOG(Warning, RenderBackend, "Attempting to read samples while sample data is not available.");
 	}
 
 	SPtr<DataStream> OAAudioClip::getSourceStream(UINT32& size)

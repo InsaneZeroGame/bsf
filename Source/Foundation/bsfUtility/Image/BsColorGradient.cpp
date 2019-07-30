@@ -7,6 +7,8 @@
 
 namespace bs
 {
+	constexpr UINT32 ColorGradient::MAX_KEYS;
+
 	ColorGradient::ColorGradient(const Color& color)
 	{
 		setConstant(color);
@@ -65,8 +67,8 @@ namespace bs
 
 		if(keys.size() > MAX_KEYS)
 		{
-			LOGWRN("Number of keys in ColorGradient exceeds the support number (" + 
-				toString(MAX_KEYS) + "). Keys will be ignored.");
+			BS_LOG(Warning, Generic, "Number of keys in ColorGradient exceeds the support number ({0}). "
+				"Keys will be ignored.", MAX_KEYS);
 		}
 
 		mDuration = duration;
@@ -124,7 +126,7 @@ namespace bs
 		}
 
 		return std::make_pair(
-			Bitwise::uintToUnorm<16>(mTimes[0]), 
+			Bitwise::uintToUnorm<16>(mTimes[0]),
 			Bitwise::uintToUnorm<16>(mTimes[mNumKeys - 1])
 		);
 	}

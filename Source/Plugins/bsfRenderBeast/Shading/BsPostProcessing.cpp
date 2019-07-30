@@ -10,10 +10,11 @@
 #include "Renderer/BsGpuResourcePool.h"
 #include "BsRendererView.h"
 #include "BsRenderBeast.h"
+#include "Utility/BsRendererTextures.h"
 
 namespace bs { namespace ct
 {
-	void setSamplerState(const SPtr<GpuParams>& params, GpuProgramType gpType, const String& name, 
+	void setSamplerState(const SPtr<GpuParams>& params, GpuProgramType gpType, const String& name,
 		const String& secondaryName, const SPtr<SamplerState>& samplerState, bool optional = false)
 	{
 		if (params->hasSamplerState(gpType, name))
@@ -129,7 +130,7 @@ namespace bs { namespace ct
 		defines.set("LOOP_COUNT_Y", LOOP_COUNT_Y);
 	}
 
-	void EyeAdaptHistogramMat::execute(const SPtr<Texture>& input, const SPtr<Texture>& output, 
+	void EyeAdaptHistogramMat::execute(const SPtr<Texture>& input, const SPtr<Texture>& output,
 		const AutoExposureSettings& settings)
 	{
 		BS_RENMAT_PROFILE_BLOCK
@@ -252,7 +253,7 @@ namespace bs { namespace ct
 		defines.set("THREADGROUP_SIZE_Y", EyeAdaptHistogramMat::THREAD_GROUP_SIZE_Y);
 	}
 
-	void EyeAdaptationMat::execute(const SPtr<Texture>& reducedHistogram, const SPtr<RenderTarget>& output, 
+	void EyeAdaptationMat::execute(const SPtr<Texture>& reducedHistogram, const SPtr<RenderTarget>& output,
 		float frameDelta, const AutoExposureSettings& settings, float exposureScale)
 	{
 		BS_RENMAT_PROFILE_BLOCK
@@ -277,7 +278,7 @@ namespace bs { namespace ct
 		return POOLED_RENDER_TEXTURE_DESC::create2D(PF_R32F, 1, 1, TU_RENDERTARGET);
 	}
 
-	void EyeAdaptationMat::populateParams(const SPtr<GpuParamBlockBuffer>& paramBuffer, float frameDelta, 
+	void EyeAdaptationMat::populateParams(const SPtr<GpuParamBlockBuffer>& paramBuffer, float frameDelta,
 		const AutoExposureSettings& settings, float exposureScale)
 	{
 		Vector2 histogramScaleAndOffset = EyeAdaptHistogramMat::getHistogramScaleOffset(settings);
@@ -324,7 +325,7 @@ namespace bs { namespace ct
 		setSamplerState(mParams, GPT_FRAGMENT_PROGRAM, "gInputSamp", "gInputTex", samplerState);
 	}
 
-	void EyeAdaptationBasicSetupMat::execute(const SPtr<Texture>& input, const SPtr<RenderTarget>& output, 
+	void EyeAdaptationBasicSetupMat::execute(const SPtr<Texture>& input, const SPtr<RenderTarget>& output,
 		float frameDelta, const AutoExposureSettings& settings, float exposureScale)
 	{
 		BS_RENMAT_PROFILE_BLOCK
@@ -363,7 +364,7 @@ namespace bs { namespace ct
 		mParams->getTextureParam(GPT_FRAGMENT_PROGRAM, "gPrevFrameTex", mPrevFrameTexParam);
 	}
 
-	void EyeAdaptationBasicMat::execute(const SPtr<Texture>& curFrame, const SPtr<Texture>& prevFrame, 
+	void EyeAdaptationBasicMat::execute(const SPtr<Texture>& curFrame, const SPtr<Texture>& prevFrame,
 		const SPtr<RenderTarget>& output, float frameDelta, const AutoExposureSettings& settings, float exposureScale)
 	{
 		BS_RENMAT_PROFILE_BLOCK
@@ -523,8 +524,8 @@ namespace bs { namespace ct
 		defines.set("LUT_SIZE", CreateTonemapLUTMat::LUT_SIZE);
 	}
 
-	void TonemappingMat::execute(const SPtr<Texture>& sceneColor, const SPtr<Texture>& eyeAdaptation, 
-		const SPtr<Texture>& bloom, const SPtr<Texture>& colorLUT, const SPtr<RenderTarget>& output, 
+	void TonemappingMat::execute(const SPtr<Texture>& sceneColor, const SPtr<Texture>& eyeAdaptation,
+		const SPtr<Texture>& bloom, const SPtr<Texture>& colorLUT, const SPtr<RenderTarget>& output,
 		const RenderSettings& settings)
 	{
 		BS_RENMAT_PROFILE_BLOCK
@@ -640,7 +641,7 @@ namespace bs { namespace ct
 		mParams->getTextureParam(GPT_FRAGMENT_PROGRAM, "gInputTex", mInputTex);
 	}
 
-	void BloomClipMat::execute(const SPtr<Texture>& input, float threshold, const SPtr<Texture>& eyeAdaptation, 
+	void BloomClipMat::execute(const SPtr<Texture>& input, float threshold, const SPtr<Texture>& eyeAdaptation,
 		const RenderSettings& settings, const SPtr<RenderTarget>& output)
 	{
 		BS_RENMAT_PROFILE_BLOCK
@@ -669,6 +670,71 @@ namespace bs { namespace ct
 		return get(getVariation<false>());
 	}
 
+	ScreenSpaceLensFlareParamDef gScreenSpaceLensFlareParamDef;
+
+	ScreenSpaceLensFlareMat::ScreenSpaceLensFlareMat()
+	{
+		mParamBuffer = gScreenSpaceLensFlareParamDef.createBuffer();
+
+		mParams->setParamBlockBuffer("Input", mParamBuffer);
+		mParams->getTextureParam(GPT_FRAGMENT_PROGRAM, "gInputTex", mInputTex);
+		mParams->getTextureParam(GPT_FRAGMENT_PROGRAM, "gGradientTex", mGradientTex);
+	}
+
+	void ScreenSpaceLensFlareMat::execute(const SPtr<Texture>& input, const ScreenSpaceLensFlareSettings& settings,
+		const SPtr<RenderTarget>& output)
+	{
+		BS_RENMAT_PROFILE_BLOCK
+
+		// Set parameters
+		gScreenSpaceLensFlareParamDef.gThreshold.set(mParamBuffer, settings.threshold);
+		gScreenSpaceLensFlareParamDef.gGhostCount.set(mParamBuffer, settings.ghostCount);
+		gScreenSpaceLensFlareParamDef.gGhostSpacing.set(mParamBuffer, settings.ghostSpacing);
+		gScreenSpaceLensFlareParamDef.gHaloRadius.set(mParamBuffer, settings.haloRadius);
+		gScreenSpaceLensFlareParamDef.gHaloThickness.set(mParamBuffer, settings.haloThickness);
+		gScreenSpaceLensFlareParamDef.gHaloThreshold.set(mParamBuffer, settings.haloThreshold);
+		gScreenSpaceLensFlareParamDef.gHaloAspectRatio.set(mParamBuffer, settings.haloAspectRatio);
+		gScreenSpaceLensFlareParamDef.gChromaticAberration.set(mParamBuffer, settings.chromaticAberrationOffset);
+
+		mInputTex.set(input);
+		mGradientTex.set(RendererTextures::lensFlareGradient);
+
+		// Render
+		RenderAPI& rapi = RenderAPI::instance();
+		rapi.setRenderTarget(output);
+
+		bind();
+		gRendererUtility().drawScreenQuad();
+	}
+
+	ScreenSpaceLensFlareMat* ScreenSpaceLensFlareMat::getVariation(bool halo, bool haloAspect, bool chromaticAberration)
+	{
+		if(halo)
+		{
+			if(haloAspect)
+			{
+				if(chromaticAberration)
+					return get(getVariation<1, true>());
+				
+				return get(getVariation<1, false>());
+			}
+			else
+			{
+				if(chromaticAberration)
+					return get(getVariation<2, true>());
+				
+				return get(getVariation<2, false>());
+			}
+		}
+		else
+		{
+			if (chromaticAberration)
+				return get(getVariation<0, true>());
+
+			return get(getVariation<0, false>());
+		}
+	}
+
 	GaussianBlurParamDef gGaussianBlurParamDef;
 
 	GaussianBlurMat::GaussianBlurMat()
@@ -676,7 +742,7 @@ namespace bs { namespace ct
 		mParamBuffer = gGaussianBlurParamDef.createBuffer();
 		mIsAdditive = mVariation.getBool("ADDITIVE");
 
-		mParams->setParamBlockBuffer("Input", mParamBuffer);
+		mParams->setParamBlockBuffer("GaussianBlurParams", mParamBuffer);
 		mParams->getTextureParam(GPT_FRAGMENT_PROGRAM, "gInputTex", mInputTexture);
 
 		if(mIsAdditive)
@@ -696,61 +762,13 @@ namespace bs { namespace ct
 		const TextureProperties& srcProps = source->getProperties();
 		const RenderTextureProperties& dstProps = destination->getProperties();
 
-		Vector2 invTexSize(1.0f / srcProps.getWidth(), 1.0f / srcProps.getHeight());
-
-		std::array<float, MAX_BLUR_SAMPLES> sampleOffsets;
-		std::array<float, MAX_BLUR_SAMPLES> sampleWeights;
-
-		POOLED_RENDER_TEXTURE_DESC tempTextureDesc = POOLED_RENDER_TEXTURE_DESC::create2D(srcProps.getFormat(), 
+		POOLED_RENDER_TEXTURE_DESC tempTextureDesc = POOLED_RENDER_TEXTURE_DESC::create2D(srcProps.getFormat(),
 			dstProps.width, dstProps.height, TU_RENDERTARGET);
-		SPtr<PooledRenderTexture> tempTexture = GpuResourcePool::instance().get(tempTextureDesc);
-
-		const auto updateParamBuffer = 
-			[&source, &filterSize, &sampleWeights, &sampleOffsets, &invTexSize, &paramBuffer = mParamBuffer]
-		(Direction direction, const Color& tint)
-		{
-			const float kernelRadius = calcKernelRadius(source, filterSize, direction);
-			const UINT32 numSamples = calcStdDistribution(kernelRadius, sampleWeights, sampleOffsets);
-
-			for(UINT32 i = 0; i < numSamples; ++i)
-			{
-				Vector4 weight(tint.r, tint.g, tint.b, tint.a);
-				weight *= sampleWeights[i];
-
-				gGaussianBlurParamDef.gSampleWeights.set(paramBuffer, weight, i);
-			}
-
-			UINT32 axis0 = direction == DirHorizontal ? 0 : 1;
-			UINT32 axis1 = (axis0 + 1) % 2;
-
-			for(UINT32 i = 0; i < (numSamples + 1) / 2; ++i)
-			{
-				UINT32 remainder = std::min(2U, numSamples - i * 2);
-
-				Vector4 offset;
-				offset[axis0] = sampleOffsets[i * 2 + 0] * invTexSize[axis0];
-				offset[axis1] = 0.0f;
-
-				if(remainder == 2)
-				{
-					offset[axis0 + 2] = sampleOffsets[i * 2 + 1] * invTexSize[axis0];
-					offset[axis1 + 2] = 0.0f;
-				}
-				else
-				{
-					offset[axis0 + 2] = 0.0f;
-					offset[axis1 + 2] = 0.0f;
-				}
-
-				gGaussianBlurParamDef.gSampleOffsets.set(paramBuffer, offset, i);
-			}
-
-			gGaussianBlurParamDef.gNumSamples.set(paramBuffer, numSamples);
-		};
+		SPtr<PooledRenderTexture> tempTexture = gGpuResourcePool().get(tempTextureDesc);
 
 		// Horizontal pass
 		{
-			updateParamBuffer(DirHorizontal, Color::White);
+			populateBuffer(mParamBuffer, DirHorizontal, source, filterSize, Color::White);
 			mInputTexture.set(source);
 
 			if(mIsAdditive)
@@ -765,7 +783,7 @@ namespace bs { namespace ct
 
 		// Vertical pass
 		{
-			updateParamBuffer(DirVertical, tint);
+			populateBuffer(mParamBuffer, DirVertical, source, filterSize, tint);
 			mInputTexture.set(tempTexture->texture);
 
 			if(mIsAdditive)
@@ -782,11 +800,9 @@ namespace bs { namespace ct
 			bind();
 			gRendererUtility().drawScreenQuad();
 		}
-
-		GpuResourcePool::instance().release(tempTexture);
 	}
 
-	UINT32 GaussianBlurMat::calcStdDistribution(float filterRadius, std::array<float, MAX_BLUR_SAMPLES>& weights, 
+	UINT32 GaussianBlurMat::calcStdDistribution(float filterRadius, std::array<float, MAX_BLUR_SAMPLES>& weights,
 		std::array<float, MAX_BLUR_SAMPLES>& offsets)
 	{
 		filterRadius = Math::clamp(filterRadius, 0.00001f, (float)(MAX_BLUR_SAMPLES - 1));
@@ -798,7 +814,7 @@ namespace bs { namespace ct
 			// Higher value gives more weight to samples near the center
 			constexpr float CENTER_BIAS = 30;
 
-			// Mathematica visualization: Manipulate[Plot[E^(-0.5*centerBias*(Abs[x]*(1/radius))^2), {x, -radius, radius}], 
+			// Mathematica visualization: Manipulate[Plot[E^(-0.5*centerBias*(Abs[x]*(1/radius))^2), {x, -radius, radius}],
 			//	{centerBias, 1, 30}, {radius, 1, 72}]
 			float samplePos = fabs((float)i) * scale;
 			return exp(-0.5f * CENTER_BIAS * samplePos * samplePos);
@@ -809,7 +825,7 @@ namespace bs { namespace ct
 		// perform two samples separately:
 		//
 		// Original formula is: t1*w1 + t2*w2
-		// With hardware filtering it's: (t1 + (t2 - t1) * o) * w3 
+		// With hardware filtering it's: (t1 + (t2 - t1) * o) * w3
 		//	Or expanded: t1*w3 - t1*o*w3 + t2*o*w3 = t1 * (w3 - o*w3) + t2 * (o*w3)
 		//
 		// These two need to equal, which means this follows:
@@ -871,6 +887,55 @@ namespace bs { namespace ct
 		return std::min(length * scale / 2, (float)MAX_BLUR_SAMPLES - 1);
 	}
 
+	void GaussianBlurMat::populateBuffer(const SPtr<GpuParamBlockBuffer>& buffer, Direction direction,
+		const SPtr<Texture>& source, float filterSize, const Color& tint)
+	{
+		const TextureProperties& srcProps = source->getProperties();
+
+		Vector2 invTexSize(1.0f / srcProps.getWidth(), 1.0f / srcProps.getHeight());
+
+		std::array<float, MAX_BLUR_SAMPLES> sampleOffsets;
+		std::array<float, MAX_BLUR_SAMPLES> sampleWeights;
+
+		const float kernelRadius = calcKernelRadius(source, filterSize, direction);
+		const UINT32 numSamples = calcStdDistribution(kernelRadius, sampleWeights, sampleOffsets);
+
+		for (UINT32 i = 0; i < numSamples; ++i)
+		{
+			Vector4 weight(tint.r, tint.g, tint.b, tint.a);
+			weight *= sampleWeights[i];
+
+			gGaussianBlurParamDef.gSampleWeights.set(buffer, weight, i);
+		}
+
+		UINT32 axis0 = direction == DirHorizontal ? 0 : 1;
+		UINT32 axis1 = (axis0 + 1) % 2;
+
+		for (UINT32 i = 0; i < (numSamples + 1) / 2; ++i)
+		{
+			UINT32 remainder = std::min(2U, numSamples - i * 2);
+
+			Vector4 offset;
+			offset[axis0] = sampleOffsets[i * 2 + 0] * invTexSize[axis0];
+			offset[axis1] = 0.0f;
+
+			if (remainder == 2)
+			{
+				offset[axis0 + 2] = sampleOffsets[i * 2 + 1] * invTexSize[axis0];
+				offset[axis1 + 2] = 0.0f;
+			}
+			else
+			{
+				offset[axis0 + 2] = 0.0f;
+				offset[axis1 + 2] = 0.0f;
+			}
+
+			gGaussianBlurParamDef.gSampleOffsets.set(buffer, offset, i);
+		}
+
+		gGaussianBlurParamDef.gNumSamples.set(buffer, numSamples);
+	}
+
 	GaussianBlurMat* GaussianBlurMat::getVariation(bool additive)
 	{
 		if(additive)
@@ -901,7 +966,7 @@ namespace bs { namespace ct
 		setSamplerState(mParams, GPT_FRAGMENT_PROGRAM, "gColorSamp", "gColorTex", samplerState);
 	}
 
-	void GaussianDOFSeparateMat::execute(const SPtr<Texture>& color, const SPtr<Texture>& depth, 
+	void GaussianDOFSeparateMat::execute(const SPtr<Texture>& color, const SPtr<Texture>& depth,
 		const RendererView& view, const DepthOfFieldSettings& settings)
 	{
 		BS_RENMAT_PROFILE_BLOCK
@@ -911,9 +976,9 @@ namespace bs { namespace ct
 		UINT32 outputWidth = std::max(1U, srcProps.getWidth() / 2);
 		UINT32 outputHeight = std::max(1U, srcProps.getHeight() / 2);
 
-		POOLED_RENDER_TEXTURE_DESC outputTexDesc = POOLED_RENDER_TEXTURE_DESC::create2D(srcProps.getFormat(), 
+		POOLED_RENDER_TEXTURE_DESC outputTexDesc = POOLED_RENDER_TEXTURE_DESC::create2D(srcProps.getFormat(),
 			outputWidth, outputHeight, TU_RENDERTARGET);
-		mOutput0 = GpuResourcePool::instance().get(outputTexDesc);
+		mOutput0 = gGpuResourcePool().get(outputTexDesc);
 
 		bool near = mVariation.getBool("NEAR");
 		bool far = mVariation.getBool("FAR");
@@ -921,7 +986,7 @@ namespace bs { namespace ct
 		SPtr<RenderTexture> rt;
 		if (near && far)
 		{
-			mOutput1 = GpuResourcePool::instance().get(outputTexDesc);
+			mOutput1 = gGpuResourcePool().get(outputTexDesc);
 
 			RENDER_TEXTURE_DESC rtDesc;
 			rtDesc.colorSurfaces[0].texture = mOutput0->texture;
@@ -965,11 +1030,8 @@ namespace bs { namespace ct
 
 	void GaussianDOFSeparateMat::release()
 	{
-		if (mOutput0 != nullptr)
-			GpuResourcePool::instance().release(mOutput0);
-
-		if (mOutput1 != nullptr)
-			GpuResourcePool::instance().release(mOutput1);
+		mOutput0 = nullptr;
+		mOutput1 = nullptr;
 	}
 
 	GaussianDOFSeparateMat* GaussianDOFSeparateMat::getVariation(bool near, bool far)
@@ -1001,7 +1063,7 @@ namespace bs { namespace ct
 			mParams->getTextureParam(GPT_FRAGMENT_PROGRAM, "gFarTex", mFarTexture);
 	}
 
-	void GaussianDOFCombineMat::execute(const SPtr<Texture>& focused, const SPtr<Texture>& near, 
+	void GaussianDOFCombineMat::execute(const SPtr<Texture>& focused, const SPtr<Texture>& near,
 		const SPtr<Texture>& far, const SPtr<Texture>& depth, const SPtr<RenderTarget>& output,
 		const RendererView& view, const DepthOfFieldSettings& settings)
 	{
@@ -1201,7 +1263,7 @@ namespace bs { namespace ct
 		setSamplerState(mParams, GPT_FRAGMENT_PROGRAM, "gRandomSamp", "gRandomTex", randomSampState);
 	}
 
-	void SSAOMat::execute(const RendererView& view, const SSAOTextureInputs& textures, 
+	void SSAOMat::execute(const RendererView& view, const SSAOTextureInputs& textures,
 		const SPtr<RenderTexture>& destination, const AmbientOcclusionSettings& settings)
 	{
 		BS_RENMAT_PROFILE_BLOCK
@@ -1224,7 +1286,7 @@ namespace bs { namespace ct
 		float viewScale = viewProps.target.viewRect.width / (float)rtProps.width;
 
 		// Ramp up the radius exponentially. c^log2(x) function chosen arbitrarily, as it ramps up the radius in a nice way
-		float scale = pow(DOWNSAMPLE_SCALE, Math::log2(viewScale)); 
+		float scale = pow(DOWNSAMPLE_SCALE, Math::log2(viewScale));
 
 		// Determine maximum radius scale (division by 4 because we don't downsample more than quarter-size)
 		float maxScale = pow(DOWNSAMPLE_SCALE, Math::log2(4.0f));
@@ -1357,7 +1419,7 @@ namespace bs { namespace ct
 		}
 	}
 
-	void SSAODownsampleMat::execute(const RendererView& view, const SPtr<Texture>& depth, const SPtr<Texture>& normals, 
+	void SSAODownsampleMat::execute(const RendererView& view, const SPtr<Texture>& depth, const SPtr<Texture>& normals,
 		const SPtr<RenderTexture>& destination, float depthRange)
 	{
 		BS_RENMAT_PROFILE_BLOCK
@@ -1415,7 +1477,7 @@ namespace bs { namespace ct
 		}
 	}
 
-	void SSAOBlurMat::execute(const RendererView& view, const SPtr<Texture>& ao, const SPtr<Texture>& depth, 
+	void SSAOBlurMat::execute(const RendererView& view, const SPtr<Texture>& ao, const SPtr<Texture>& depth,
 		const SPtr<RenderTexture>& destination, float depthRange)
 	{
 		BS_RENMAT_PROFILE_BLOCK
@@ -1469,7 +1531,7 @@ namespace bs { namespace ct
 		mParams->setParamBlockBuffer("Input", mParamBuffer);
 	}
 
-	void SSRStencilMat::execute(const RendererView& view, GBufferTextures gbuffer, 
+	void SSRStencilMat::execute(const RendererView& view, GBufferTextures gbuffer,
 		const ScreenSpaceReflectionsSettings& settings)
 	{
 		BS_RENMAT_PROFILE_BLOCK
@@ -1533,8 +1595,8 @@ namespace bs { namespace ct
 			mParams->setSamplerState(GPT_FRAGMENT_PROGRAM, "gHiZ", hiZSamplerState);
 	}
 
-	void SSRTraceMat::execute(const RendererView& view, GBufferTextures gbuffer, const SPtr<Texture>& sceneColor, 
-			const SPtr<Texture>& hiZ, const ScreenSpaceReflectionsSettings& settings, 
+	void SSRTraceMat::execute(const RendererView& view, GBufferTextures gbuffer, const SPtr<Texture>& sceneColor,
+			const SPtr<Texture>& hiZ, const ScreenSpaceReflectionsSettings& settings,
 			const SPtr<RenderTarget>& destination)
 	{
 		BS_RENMAT_PROFILE_BLOCK
@@ -1689,7 +1751,7 @@ namespace bs { namespace ct
 		}
 	}
 
-	void SSRResolveMat::execute(const RendererView& view, const SPtr<Texture>& prevFrame, 
+	void SSRResolveMat::execute(const RendererView& view, const SPtr<Texture>& prevFrame,
 		const SPtr<Texture>& curFrame, const SPtr<Texture>& sceneDepth, const SPtr<RenderTarget>& destination)
 	{
 		BS_RENMAT_PROFILE_BLOCK
@@ -1729,7 +1791,7 @@ namespace bs { namespace ct
 		float sharpness = 1.0f; // Make this a customizable parameter eventually
 		if(useYCoCg)
 		{
-			static const Vector2 sampleOffsets[] = 
+			static const Vector2 sampleOffsets[] =
 			{
 				{  0.0f, -1.0f },
 				{ -1.0f,  0.0f },
@@ -1756,7 +1818,7 @@ namespace bs { namespace ct
 		}
 		else
 		{
-			static const Vector2 sampleOffsets[] = 
+			static const Vector2 sampleOffsets[] =
 			{
 				{ -1.0f, -1.0f },
 				{  0.0f, -1.0f },
@@ -1857,7 +1919,7 @@ namespace bs { namespace ct
 		:mGBufferParams(GPT_FRAGMENT_PROGRAM, mParams)
 	{ }
 
-	void MSAACoverageMat::execute(const RendererView& view, GBufferTextures gbuffer) 
+	void MSAACoverageMat::execute(const RendererView& view, GBufferTextures gbuffer)
 	{
 		BS_RENMAT_PROFILE_BLOCK
 

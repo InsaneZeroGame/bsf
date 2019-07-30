@@ -109,15 +109,15 @@ namespace bs
 			{
 			case 0:
 				ss << "PhysX info (" << errorCode << "): " << message << " at " << file << ":" << line;
-				LOGDBG(ss.str());
+				BS_LOG(Info, Physics, ss.str());
 				break;
 			case 1:
 				ss << "PhysX warning (" << errorCode << "): " << message << " at " << file << ":" << line;
-				LOGWRN(ss.str());
+				BS_LOG(Warning, Physics, ss.str());
 				break;
 			case 2:
 				ss << "PhysX error (" << errorCode << "): " << message << " at " << file << ":" << line;
-				LOGERR(ss.str());
+				BS_LOG(Error, Physics, ss.str());
 				BS_ASSERT(false); // Halt execution on debug builds when error occurs
 				break;
 			}
@@ -264,8 +264,8 @@ namespace bs
 			}
 		}
 
-		void onConstraintBreak(PxConstraintInfo* constraints, PxU32 count) override 
-		{ 
+		void onConstraintBreak(PxConstraintInfo* constraints, PxU32 count) override
+		{
 			for (UINT32 i = 0; i < count; i++)
 			{
 				PxConstraintInfo& constraintInfo = constraints[i];
@@ -291,7 +291,7 @@ namespace bs
 		{
 			// Note: Framework's task scheduler is pretty low granularity. Consider a better task manager in case PhysX ends
 			// up submitting many tasks.
-			// - PhysX's task manager doesn't seem much lighter either. But perhaps I can at least create a task pool to 
+			// - PhysX's task manager doesn't seem much lighter either. But perhaps I can at least create a task pool to
 			//   avoid allocating them constantly.
 
 			auto runTask = [&]() { physxTask.run(); physxTask.release(); };
@@ -312,13 +312,13 @@ namespace bs
 		{
 			Collider* collider = (Collider*)shape.userData;
 			if (collider != nullptr)
-				LOGWRN("Physics object out of bounds. Consider increasing broadphase region!");
+				BS_LOG(Warning, Physics, "Physics object out of bounds. Consider increasing broadphase region!");
 		}
 
 		void onObjectOutOfBounds(PxAggregate& aggregate) override { /* Do nothing */ }
 	};
 
-	PxFilterFlags PhysXFilterShader(PxFilterObjectAttributes attr0, PxFilterData data0, PxFilterObjectAttributes attr1, 
+	PxFilterFlags PhysXFilterShader(PxFilterObjectAttributes attr0, PxFilterData data0, PxFilterObjectAttributes attr1,
 		PxFilterData data1, PxPairFlags& pairFlags, const void* constantBlock, PxU32 constantBlockSize)
 	{
 		PhysXObjectFilterFlags flags0 = PhysXObjectFilterFlags(data0.word2);
@@ -540,7 +540,7 @@ namespace bs
 
 			UINT32 errorState;
 			if (!scene->mScene->fetchResults(true, &errorState))
-				LOGWRN("Physics simulation failed. Error code: " + toString(errorState));
+				BS_LOG(Warning, Physics, "Physics simulation failed. Error code: {0}", errorState);
 		}
 
 		bs_frame_free_aligned(scratchBuffer);
@@ -619,7 +619,7 @@ namespace bs
 			}
 		}
 
-		auto notifyContact = [&](Collider* obj, Collider* other, ContactEventType type, 
+		auto notifyContact = [&](Collider* obj, Collider* other, ContactEventType type,
 			const Vector<ContactPoint>& points, bool flipNormals = false)
 		{
 			data.colliders[0] = obj;
@@ -805,7 +805,7 @@ namespace bs
 		return bs_shared_ptr_new<PhysXPlaneCollider>(mPhysics, mScene, position, rotation);
 	}
 
-	SPtr<CapsuleCollider> PhysXScene::createCapsuleCollider(float radius, float halfHeight, const Vector3& position, 
+	SPtr<CapsuleCollider> PhysXScene::createCapsuleCollider(float radius, float halfHeight, const Vector3& position,
 		const Quaternion& rotation)
 	{
 		return bs_shared_ptr_new<PhysXCapsuleCollider>(mPhysics, mScene, position, rotation, radius, halfHeight);
@@ -865,7 +865,7 @@ namespace bs
 		return output.data;
 	}
 
-	bool PhysXScene::sweepAny(const PxGeometry& geometry, const PxTransform& tfrm, const Vector3& unitDir, UINT64 layer, 
+	bool PhysXScene::sweepAny(const PxGeometry& geometry, const PxTransform& tfrm, const Vector3& unitDir, UINT64 layer,
 		float maxDist) const
 	{
 		PxSweepBuffer output;
@@ -874,7 +874,7 @@ namespace bs
 		filterData.flags |= PxQueryFlag::eANY_HIT;
 		memcpy(&filterData.data.word0, &layer, sizeof(layer));
 
-		return mScene->sweep(geometry, tfrm, toPxVector(unitDir), maxDist, output, 
+		return mScene->sweep(geometry, tfrm, toPxVector(unitDir), maxDist, output,
 			PxHitFlag::eDEFAULT | PxHitFlag::eUV | PxHitFlag::eMESH_ANY, filterData);
 	}
 

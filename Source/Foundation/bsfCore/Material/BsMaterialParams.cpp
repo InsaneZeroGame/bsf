@@ -266,7 +266,7 @@ namespace bs
 		return GetParamResult::Success;
 	}
 
-	MaterialParamsBase::GetParamResult MaterialParamsBase::getParamData(const String& name, ParamType type, 
+	MaterialParamsBase::GetParamResult MaterialParamsBase::getParamData(const String& name, ParamType type,
 		GpuParamDataType dataType, UINT32 arrayIdx, const ParamData** output) const
 	{
 		auto iterFind = mParamLookup.find(name);
@@ -291,13 +291,13 @@ namespace bs
 		switch (errorCode)
 		{
 		case GetParamResult::NotFound:
-			LOGWRN("Material doesn't have a parameter named " + name + ".");
+			BS_LOG(Warning, Material, "Material doesn't have a parameter named {0}.", name);
 			break;
 		case GetParamResult::InvalidType:
-			LOGWRN("Parameter \"" + name + "\" is not of the requested type.");
+			BS_LOG(Warning, Material, "Parameter \"{0}\" is not of the requested type.", name);
 			break;
 		case GetParamResult::IndexOutOfBounds:
-			LOGWRN("Parameter \"" + name + "\" array index " + toString(arrayIdx) + " out of range.");
+			BS_LOG(Warning, Material, "Parameter \"{0}\" array index {1} out of range.", name, arrayIdx);
 			break;
 		default:
 			break;
@@ -623,8 +623,8 @@ namespace bs
 		const ParamStructDataType& structParam = mStructParams[param.index + arrayIdx];
 		if (structParam.dataSize != size)
 		{
-			LOGWRN("Size mismatch when writing to a struct. Provided size was " + toString(size) + " bytes but the "
-				"struct size is" + toString(structParam.dataSize) + " bytes");
+			BS_LOG(Warning, Material, "Size mismatch when writing to a struct. Provided size was {0} bytes but the struct "
+				"size is {1} bytes", size, structParam.dataSize);
 			return;
 		}
 
@@ -637,8 +637,8 @@ namespace bs
 		const ParamStructDataType& structParam = mStructParams[param.index + arrayIdx];
 		if (structParam.dataSize != size)
 		{
-			LOGWRN("Size mismatch when writing to a struct. Provided size was " + toString(size) + " bytes but the "
-				"struct size is" + toString(structParam.dataSize) + " bytes");
+			BS_LOG(Warning, Material, "Size mismatch when writing to a struct. Provided size was {0} bytes but the struct "
+				"size is {1} bytes", size, structParam.dataSize);
 			return;
 		}
 
@@ -903,7 +903,7 @@ namespace bs
 
 		if(size != totalSize)
 		{
-			LOGERR("Invalid buffer size provided, ignoring.");
+			BS_LOG(Error, Material, "Invalid buffer size provided, ignoring.");
 			return;
 		}
 

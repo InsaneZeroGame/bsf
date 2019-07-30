@@ -329,7 +329,7 @@ function(update_binary_deps DEP_PREFIX DEP_NAME DEP_FOLDER DEP_VERSION)
 	endif()
 
 	set(BINARY_DEPENDENCIES_URL ${BS_BINARY_DEP_WEBSITE}/${DEP_PREFIX}_${DEP_TYPE}_Master_${DEP_VERSION}.zip)
-	file(DOWNLOAD ${BINARY_DEPENDENCIES_URL} ${PROJECT_SOURCE_DIR}/Temp/Dependencies.zip 
+	file(DOWNLOAD ${BINARY_DEPENDENCIES_URL} ${PROJECT_SOURCE_DIR}/Temp/Dependencies.zip
 		SHOW_PROGRESS
 		STATUS DOWNLOAD_STATUS)
 		
@@ -372,7 +372,7 @@ function(check_and_update_binary_deps DEP_PREFIX DEP_NAME DEP_FOLDER DEP_VERSION
 endfunction()
 
 function(strip_symbols targetName outputFilename)
-	if(UNIX)
+	if(UNIX AND BSF_STRIP_DEBUG_INFO)
 		if(CMAKE_BUILD_TYPE STREQUAL Release)
 			set(fileToStrip $<TARGET_FILE:${targetName}>)
 
@@ -383,7 +383,7 @@ function(strip_symbols targetName outputFilename)
 				add_custom_command(
 					TARGET ${targetName}
 					POST_BUILD
-					VERBATIM 
+					VERBATIM
 					COMMAND ${DSYMUTIL_TOOL} --flat --minimize ${fileToStrip}
 					COMMAND ${STRIP_TOOL} -u -r ${fileToStrip}
 					COMMENT Stripping symbols from ${fileToStrip} into file ${symbolsFile}
@@ -396,7 +396,7 @@ function(strip_symbols targetName outputFilename)
 				add_custom_command(
 					TARGET ${targetName}
 					POST_BUILD
-					VERBATIM 
+					VERBATIM
 					COMMAND ${OBJCOPY_TOOL} --only-keep-debug ${fileToStrip} ${symbolsFile}
 					COMMAND ${OBJCOPY_TOOL} --strip-unneeded ${fileToStrip}
 					COMMAND ${OBJCOPY_TOOL} --add-gnu-debuglink=${symbolsFile} ${fileToStrip}
@@ -433,13 +433,13 @@ function(install_bsf_target targetName)
 	
 	if(MSVC)
 		install(
-			FILES $<TARGET_PDB_FILE:${targetName}> 
+			FILES $<TARGET_PDB_FILE:${targetName}>
 			DESTINATION ${BIN_DIR}
 			OPTIONAL
 		)
 	else()
 		install(
-			FILES ${symbolsFile} 
+			FILES ${symbolsFile}
 			DESTINATION lib
 			OPTIONAL)
 	endif()
@@ -502,7 +502,7 @@ function(copy_folder_on_build target srcDir dstDir name filter)
 endfunction()
 
 function(generate_csharp_project folder project_name namespace assembly refs projectRefs)
-	file(GLOB_RECURSE ALL_FILES RELATIVE ${folder} ${folder}/*.cs)
+	file(GLOB_RECURSE ALL_FILES ${folder} ${folder}/*.cs)
 		
 	set(BS_SHARP_FILE_LIST "")
 	foreach(CUR_FILE ${ALL_FILES})
@@ -528,7 +528,7 @@ function(generate_csharp_project folder project_name namespace assembly refs pro
 
 	configure_file(
 		${folder}/${project_name}.csproj.in
-		${folder}/${BS_SHARP_ASSEMBLY_NAME}.csproj)
+		${PROJECT_BINARY_DIR}/${BS_SHARP_ASSEMBLY_NAME}.csproj)
 endfunction()
 
 function(add_common_flags target)
@@ -654,7 +654,7 @@ function(update_builtin_assets ASSET_PREFIX ASSET_FOLDER FOLDER_NAME ASSET_VERSI
 	execute_process(COMMAND ${CMAKE_COMMAND} -E make_directory ${PROJECT_SOURCE_DIR}/Temp)	
 	
 	set(ASSET_DEPENDENCIES_URL ${BS_BINARY_DEP_WEBSITE}/${ASSET_PREFIX}Data_Master_${ASSET_VERSION}.zip)
-	file(DOWNLOAD ${ASSET_DEPENDENCIES_URL} ${PROJECT_SOURCE_DIR}/Temp/Dependencies.zip 
+	file(DOWNLOAD ${ASSET_DEPENDENCIES_URL} ${PROJECT_SOURCE_DIR}/Temp/Dependencies.zip
 		SHOW_PROGRESS
 		STATUS DOWNLOAD_STATUS)
 		

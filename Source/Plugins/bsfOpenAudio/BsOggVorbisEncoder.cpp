@@ -24,7 +24,7 @@ namespace bs
 		close();
 	}
 
-	bool OggVorbisEncoder::open(std::function<void(UINT8*, UINT32)> writeCallback, UINT32 sampleRate, UINT32 bitDepth, 
+	bool OggVorbisEncoder::open(std::function<void(UINT8*, UINT32)> writeCallback, UINT32 sampleRate, UINT32 bitDepth,
 		UINT32 numChannels)
 	{
 		mNumChannels = numChannels;
@@ -39,7 +39,7 @@ namespace bs
 		INT32 status = vorbis_encode_init_vbr(&mVorbisInfo, numChannels, sampleRate, 0.4f);
 		if (status != 0)
 		{
-			LOGERR("Failed to write Ogg Vorbis file.");
+			BS_LOG(Error, Audio, "Failed to write Ogg Vorbis file.");
 			close();
 			return false;
 		}
@@ -57,7 +57,7 @@ namespace bs
 
 		if (status != 0)
 		{
-			LOGERR("Failed to write Ogg Vorbis file.");
+			BS_LOG(Error, Audio, "Failed to write Ogg Vorbis file.");
 			close();
 			return false;
 		}
