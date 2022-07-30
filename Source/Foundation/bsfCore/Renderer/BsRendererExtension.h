@@ -5,7 +5,10 @@
 #include "BsCorePrerequisites.h"
 
 namespace bs
-{
+{namespace ct {
+		struct RendererViewContext;
+	}
+
 	/** @addtogroup Renderer-Internal
 	 *  @{
 	 */
@@ -43,7 +46,37 @@ namespace bs
 		 * the final scene color buffer, with post-processing. The renderer guarantees the final scene color render target
 		 * will be bound.
 		 */
-		Overlay
+		Overlay,
+
+		Count // Keep at end
+	};
+
+	/** Determines possible results from RendererExtension::check method. */
+	enum class RendererExtensionRequest
+	{
+		/**
+		 * Ensures RendererExtension::render method() will be called. You want to set this to true
+		 * if the internal data that's being rendered has changed since the last render() call for
+		 * the specified camera.
+		 */
+		ForceRender,
+
+		/**
+		 * RendererExtension::render() method will be called only if the underlying render target
+		 * will change and its contents need to be redrawn. You want to set this to true if the
+		 * internal data being rendered is the same as the previous frame. If your scene is fully
+		 * static and nothing is changing then this will avoid doing unnecessary redrawing.
+		 *
+		 * Note that if any extension for the same camera and render location returns ForceRender
+		 * that will dirty the render target and require all relevant extensions to be redrawn.
+		 */
+		RenderIfTargetDirty,
+
+		/**
+		 * RendererExtension::render() method will not be called. e.g. use this if the camera provided
+		 * is not relevant for the purposes of the extension.
+		 */
+		DontRender
 	};
 
 	/**
@@ -78,14 +111,17 @@ namespace bs
 		virtual void destroy() {}
 
 		/** Returns true if the render() method should be called for the provided camera. */
-		virtual bool check(const ct::Camera& camera) = 0;
+		virtual RendererExtensionRequest check(const ct::Camera& camera) = 0;
 
 		/**
 		 * Called at the point at which rendering should be performed for the provided camera. Relevant render targets
 		 * are guaranteed to be already bound to the render API, depending on the RenderLocation. Note that actual structure
 		 * of the render targets depends on the active renderer.
+		 *
+		 * @param[in]	camera			Camera through which the renderer is currently rendering.
+		 * @param[in]	viewContext		Additional information about the currently rendered view.
 		 */
-		virtual void render(const ct::Camera& camera) = 0;
+		virtual void render(const ct::Camera& camera, const ct::RendererViewContext& viewContext) = 0;
 
 		/**
 		 * Determines when will the render() method execute, compared to other plugins using the same RenderLocation.

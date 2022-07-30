@@ -461,6 +461,90 @@ namespace bs { namespace ct
 		GpuParamTexture mGradientTex;
 	};
 
+	BS_PARAM_BLOCK_BEGIN(ChromaticAberrationParamDef)
+		BS_PARAM_BLOCK_ENTRY(Vector2, gInputSize)
+		BS_PARAM_BLOCK_ENTRY(float, gShiftAmount)
+	BS_PARAM_BLOCK_END
+
+	extern ChromaticAberrationParamDef gChromaticAberrationParamDef;
+
+	/** Renders a chromatic aberration effect by shifting RGB color channels. */
+	class ChromaticAberrationMat : public RendererMaterial<ChromaticAberrationMat>
+	{
+		RMAT_DEF_CUSTOMIZED("PPChromaticAberration.bsl");
+
+		static constexpr int MAX_SAMPLES = 16;
+
+		/** Helper method used for initializing variations of this material. */
+		template<bool SIMPLE>
+		static const ShaderVariation& getVariation()
+		{
+			static ShaderVariation variation = ShaderVariation(
+				{
+					ShaderVariation::Param("SIMPLE", SIMPLE)
+				});
+
+			return variation;
+		}
+	public:
+		ChromaticAberrationMat();
+
+		/**
+		 * Executes the post-process effect with the provided parameters and writes the results to the provided
+		 * render target.
+		 *
+		 * @param[in]	input		Texture to process.
+		 * @param[in]	settings	Settings used for customizing the effect.
+		 * @param[in]	output		Render target to write the results to.
+		 */
+		void execute(const SPtr<Texture>& input, const ChromaticAberrationSettings& settings,
+			const SPtr<RenderTarget>& output);
+
+		/**
+		 * Returns the material variation matching the provided parameters.
+		 *
+		 * @param[in]	type		Type that determines how is the effect performed.
+		 */
+		static ChromaticAberrationMat* getVariation(ChromaticAberrationType type);
+	private:
+		SPtr<GpuParamBlockBuffer> mParamBuffer;
+
+		GpuParamTexture mInputTex;
+		GpuParamTexture mFringeTex;
+	};
+
+	BS_PARAM_BLOCK_BEGIN(FilmGrainParamDef)
+		BS_PARAM_BLOCK_ENTRY(float, gIntensity)
+		BS_PARAM_BLOCK_ENTRY(float, gTime)
+	BS_PARAM_BLOCK_END
+
+	extern FilmGrainParamDef gFilmGrainParamDef;
+
+	/** Renders a film grain effect using a noise function. */
+	class FilmGrainMat : public RendererMaterial<FilmGrainMat>
+	{
+		RMAT_DEF("PPFilmGrain.bsl");
+
+	public:
+		FilmGrainMat();
+
+		/**
+		 * Executes the post-process effect with the provided parameters and writes the results to the provided
+		 * render target.
+		 *
+		 * @param[in]	input		Texture to process.
+		 * @param[in]	time		Time of the current frame, in seconds.
+		 * @param[in]	settings	Settings used for customizing the effect.
+		 * @param[in]	output		Render target to write the results to.
+		 */
+		void execute(const SPtr<Texture>& input, float time, const FilmGrainSettings& settings,
+			const SPtr<RenderTarget>& output);
+	private:
+		SPtr<GpuParamBlockBuffer> mParamBuffer;
+
+		GpuParamTexture mInputTex;
+	};
+
 	const int MAX_BLUR_SAMPLES = 128;
 
 	BS_PARAM_BLOCK_BEGIN(GaussianBlurParamDef)
@@ -678,12 +762,221 @@ namespace bs { namespace ct
 		GpuParamTexture mDepthTexture;
 	};
 
+	BS_PARAM_BLOCK_BEGIN(DepthOfFieldCommonParamDef)
+		BS_PARAM_BLOCK_ENTRY(float, gFocalPlaneDistance)
+		BS_PARAM_BLOCK_ENTRY(float, gApertureSize)
+		BS_PARAM_BLOCK_ENTRY(float, gFocalLength)
+		BS_PARAM_BLOCK_ENTRY(float, gInFocusRange)
+		BS_PARAM_BLOCK_ENTRY(float, gSensorSize)
+		BS_PARAM_BLOCK_ENTRY(float, gImageSize)
+		BS_PARAM_BLOCK_ENTRY(float, gMaxBokehSize)
+		BS_PARAM_BLOCK_ENTRY(float, gNearTransitionRegion)
+		BS_PARAM_BLOCK_ENTRY(float, gFarTransitionRegion)
+	BS_PARAM_BLOCK_END
+
+	BS_PARAM_BLOCK_BEGIN(BokehDOFPrepareParamDef)
+		BS_PARAM_BLOCK_ENTRY(Vector2, gInvInputSize)
+	BS_PARAM_BLOCK_END
+
+	/**
+	 * Shader does a 2x texture downsample while accounting for different depth of field layers and encoding depth into
+	 * the output.
+	 */
+	class BokehDOFPrepareMat : public RendererMaterial<BokehDOFPrepareMat>
+	{
+		RMAT_DEF("PPBokehDOFPrepare.bsl");
+
+		/** Helper method used for initializing variations of this material. */
+		template<bool MSAA>
+		static const ShaderVariation& getVariation()
+		{
+			static ShaderVariation variation = ShaderVariation(
+				{
+					ShaderVariation::Param("MSAA_COUNT", MSAA ? 2 : 1)
+				});
+
+			return variation;
+		}
+	public:
+		BokehDOFPrepareMat();
+
+		/**
+		 * Renders the post-process effect with the provided parameters.
+		 *
+		 * @param[in]	input		Input texture to downsample.
+		 * @param[in]	depth		Input depth buffer texture that will be used for determining pixel depth.
+		 * @param[in]	view		View through which the depth of field effect is viewed.
+		 * @param[in]	settings	Settings used to control depth of field rendering.
+		 * @param[in]	output		Texture to output the results to.
+		 */
+		void execute(const SPtr<Texture>& input, const SPtr<Texture>& depth, const RendererView& view,
+			const DepthOfFieldSettings& settings, const SPtr<RenderTarget>& output);
+
+		/** Returns the texture descriptor that can be used for initializing the output render target. */
+		static POOLED_RENDER_TEXTURE_DESC getOutputDesc(const SPtr<Texture>& target);
+
+		/** Returns the material variation matching the provided parameters. */
+		static BokehDOFPrepareMat* getVariation(bool msaa);
+	private:
+		SPtr<GpuParamBlockBuffer> mParamBuffer;
+		SPtr<GpuParamBlockBuffer> mCommonParamBuffer;
+		GpuParamTexture mInputTexture;
+		GpuParamTexture mDepthTexture;
+	};
+
+	BS_PARAM_BLOCK_BEGIN(BokehDOFParamDef)
+		BS_PARAM_BLOCK_ENTRY(Vector2I, gTileCount)
+		BS_PARAM_BLOCK_ENTRY(Vector2, gInvInputSize)
+		BS_PARAM_BLOCK_ENTRY(Vector2, gInvOutputSize)
+		BS_PARAM_BLOCK_ENTRY(float, gAdaptiveThresholdColor)
+		BS_PARAM_BLOCK_ENTRY(float, gAdaptiveThresholdCOC)
+		BS_PARAM_BLOCK_ENTRY(Vector2, gBokehSize)
+		BS_PARAM_BLOCK_ENTRY(int, gLayerPixelOffset)
+		BS_PARAM_BLOCK_ENTRY(float, gInvDepthRange)
+	BS_PARAM_BLOCK_END
+
+	/** 
+	 * Shader that renders the Bokeh DOF sprites and generates the blurred depth of field images. Separate images
+	 * are generated for the near-field and in-focus + far-field.
+	 */
+	class BokehDOFMat : public RendererMaterial<BokehDOFMat>
+	{
+		RMAT_DEF_CUSTOMIZED("PPBokehDOF.bsl");
+		
+		/** Helper method used for initializing variations of this material. */
+		template<bool DEPTH_OCCLUSION>
+		static const ShaderVariation& getVariation()
+		{
+			static ShaderVariation variation = ShaderVariation(
+			{
+				ShaderVariation::Param("DEPTH_OCCLUSION", DEPTH_OCCLUSION)
+			});
+
+			return variation;
+		}
+	public:
+		static constexpr UINT32 NEAR_FAR_PADDING = 128;
+		static constexpr UINT32 QUADS_PER_TILE = 8;
+
+		BokehDOFMat();
+
+		/**
+		 * Renders the post-process effect with the provided parameters.
+		 *
+		 * @param[in]	input		Input texture as generated by BokehDOFPrepare material..
+		 * @param[in]	view		View through which the depth of field effect is viewed.
+		 * @param[in]	settings	Settings used to control depth of field rendering.
+		 * @param[in]	output		Texture to output the results to.
+		 */
+		void execute(const SPtr<Texture>& input, const RendererView& view, const DepthOfFieldSettings& settings,
+			const SPtr<RenderTarget>& output);
+
+		/** Returns the texture descriptor that can be used for initializing the output render target. */
+		static POOLED_RENDER_TEXTURE_DESC getOutputDesc(const SPtr<Texture>& target);
+
+		/** Populates the common depth of field parameter buffers with values from the provided settings object. */
+		static void populateDOFCommonParams(const SPtr<GpuParamBlockBuffer>& buffer, const DepthOfFieldSettings& settings,
+			const RendererView& view);
+
+		/** Returns the material variation matching the provided parameters. */
+		static BokehDOFMat* getVariation(bool depthOcclusion);
+	private:
+		SPtr<GpuParamBlockBuffer> mParamBuffer;
+		SPtr<GpuParamBlockBuffer> mCommonParamBuffer;
+		GpuParamTexture mInputTextureVS;
+		GpuParamTexture mInputTextureFS;
+		GpuParamTexture mBokehTexture;
+		GpuParamTexture mDepthTexture;
+
+		SPtr<VertexDeclaration> mTileVertexDecl;
+		SPtr<IndexBuffer> mTileIndexBuffer;
+		SPtr<VertexBuffer> mTileVertexBuffer;
+	};
+
+	BS_PARAM_BLOCK_BEGIN(BokehDOFCombineParamDef)
+		BS_PARAM_BLOCK_ENTRY(Vector2, gLayerAndScaleOffset)
+		BS_PARAM_BLOCK_ENTRY(Vector2, gFocusedImageSize)
+	BS_PARAM_BLOCK_END
+
+	/** Shader that combines the unfocused texture's near and far layers, together with the focused version. */
+	class BokehDOFCombineMat : public RendererMaterial<BokehDOFCombineMat>
+	{
+		RMAT_DEF("PPBokehDOFCombine.bsl");
+
+		/** Helper method used for initializing variations of this material. */
+		template<MSAAMode MSAA_MODE>
+		static const ShaderVariation& getVariation()
+		{
+			static ShaderVariation variation = ShaderVariation(
+			{
+				ShaderVariation::Param("MSAA_MODE", (INT32)MSAA_MODE)
+			});
+
+			return variation;
+		}
+	public:
+		BokehDOFCombineMat();
+
+		/**
+		 * Renders the post-process effect with the provided parameters.
+		 *
+		 * @param[in]	unfocused	Unfocused and half-resolution texture as generated by the BokehDOF material, containing 
+		 *							the near and far unfocused layers.
+		 * @param[in]	focused		Focused full resolution scene color.
+		 * @param[in]	depth		Input depth buffer texture that will be used for determining pixel depth.
+		 * @param[in]	view		View through which the depth of field effect is viewed.
+		 * @param[in]	settings	Settings used to control depth of field rendering.
+		 * @param[in]	output		Texture to output the results to.
+		 */
+		void execute(const SPtr<Texture>& unfocused, const SPtr<Texture>& focused, const SPtr<Texture>& depth,
+			const RendererView& view, const DepthOfFieldSettings& settings, const SPtr<RenderTarget>& output);
+
+
+		/** Returns the material variation matching the provided parameters. */
+		static BokehDOFCombineMat* getVariation(MSAAMode msaaMode);
+	private:
+		SPtr<GpuParamBlockBuffer> mParamBuffer;
+		SPtr<GpuParamBlockBuffer> mCommonParamBuffer;
+		GpuParamTexture mUnfocusedTexture;
+		GpuParamTexture mFocusedTexture;
+		GpuParamTexture mDepthTexture;
+	};
+
+	BS_PARAM_BLOCK_BEGIN(MotionBlurParamDef)
+		BS_PARAM_BLOCK_ENTRY(UINT32, gHalfNumSamples)
+	BS_PARAM_BLOCK_END
+
+	/** Shader that blurs the scene depending on camera and/or object movement. */
+	class MotionBlurMat : public RendererMaterial<MotionBlurMat>
+	{
+		RMAT_DEF("PPMotionBlur.bsl");
+
+	public:
+		MotionBlurMat();
+
+		/**
+		 * Renders the post-process effect with the provided parameters.
+		 *
+		 * @param[in]	input		Input texture to blur.
+		 * @param[in]	depth		Input depth buffer texture that will be used for determining pixel depth.
+		 * @param[in]	view		View through which the depth of field effect is viewed.
+		 * @param[in]	settings	Settings used to control the motion blur effect.
+		 * @param[in]	output		Texture to output the results to.
+		 */
+		void execute(const SPtr<Texture>& input, const SPtr<Texture>& depth, const RendererView& view,
+			const MotionBlurSettings& settings, const SPtr<RenderTarget>& output);
+	private:
+		SPtr<GpuParamBlockBuffer> mParamBuffer;
+		GpuParamTexture mInputTexture;
+		GpuParamTexture mDepthTexture;
+	};
+
 	BS_PARAM_BLOCK_BEGIN(BuildHiZFParamDef)
 		BS_PARAM_BLOCK_ENTRY(Vector2, gHalfPixelOffset)
 		BS_PARAM_BLOCK_ENTRY(int, gMipLevel)
 	BS_PARAM_BLOCK_END
 
-	extern BuildHiZFParamDef sBuildHiZFParamDef;
+	extern BuildHiZFParamDef gBuildHiZFParamDef;
 
 	/** Shader that calculates a single level of the hierarchical Z mipmap chain. */
 	class BuildHiZMat : public RendererMaterial<BuildHiZMat>
@@ -1058,62 +1351,83 @@ namespace bs { namespace ct
 
 	extern TemporalResolveParamDef gTemporalResolveParamDef;
 
-	BS_PARAM_BLOCK_BEGIN(SSRResolveParamDef)
-		BS_PARAM_BLOCK_ENTRY(Vector2, gSceneDepthTexelSize)
-		BS_PARAM_BLOCK_ENTRY(Vector2, gSceneColorTexelSize)
+	BS_PARAM_BLOCK_BEGIN(TemporalFilteringParamDef)
+		BS_PARAM_BLOCK_ENTRY(Vector4, gSceneDepthTexelSize)
+		BS_PARAM_BLOCK_ENTRY(Vector4, gSceneColorTexelSize)
+		BS_PARAM_BLOCK_ENTRY(Vector4, gVelocityTexelSize)
 		BS_PARAM_BLOCK_ENTRY(float, gManualExposure)
 	BS_PARAM_BLOCK_END
 
-	extern SSRResolveParamDef gSSRResolveParamDef;
+	extern TemporalFilteringParamDef gTemporalFilteringParamDef;
 
-	/** Shader used for combining SSR information from the previous frame, in order to yield better quality. */
-	class SSRResolveMat : public RendererMaterial<SSRResolveMat>
+	/** Supported filter types by TemporalFilteringMat. */
+	enum class TemporalFilteringType
 	{
-		RMAT_DEF("PPSSRResolve.bsl");
+		/** Temporal filter used for full screen anti-aliasing. */
+		FullScreenAA,
+
+		/** Temporal filter used for accumulating SSR samples over multiple frames. */
+		SSR
+	};
+
+	/** Shader used for combining multiple frames of information using a temporal filter, in order to yield better quality. */
+	class TemporalFilteringMat : public RendererMaterial<TemporalFilteringMat>
+	{
+		RMAT_DEF("TemporalFiltering.bsl");
 
 		/** Helper method used for initializing variations of this material. */
-		template<bool msaa>
+		template<TemporalFilteringType TYPE, bool PER_PIXEL_VELOCITY, bool MSAA>
 		static const ShaderVariation& getVariation()
 		{
 			static ShaderVariation variation = ShaderVariation(
 			{
-				ShaderVariation::Param("MSAA", msaa)
+				ShaderVariation::Param("TYPE", (int)TYPE),
+				ShaderVariation::Param("PER_PIXEL_VELOCITY", (int)PER_PIXEL_VELOCITY),
+				ShaderVariation::Param("MSAA", MSAA),
 			});
 
 			return variation;
 		}
 	public:
-		SSRResolveMat();
+		TemporalFilteringMat();
 
 		/**
 		 * Renders the effect with the provided parameters.
 		 *
 		 * @param[in]	view			Information about the view we're rendering from.
-		 * @param[in]	prevFrame		SSR data calculated previous frame.
-		 * @param[in]	curFrame		SSR data calculated this frame.
+		 * @param[in]	prevFrame		Frame data calculated previous frame.
+		 * @param[in]	curFrame		Frame data calculated this frame.
+		 * @param[in]	velocity		Optional texture containing per-pixel velocity;
 		 * @param[in]	sceneDepth		Buffer containing scene depth.
+		 * @param[in]	jitter			Sub-pixel jitter applied to the projection matrix.
+		 * @param[in]	exposure		Exposure to use when transforming from HDR to LDR image.
 		 * @param[in]	destination		Render target to which to write the results to.
 		 */
 		void execute(const RendererView& view, const SPtr<Texture>& prevFrame, const SPtr<Texture>& curFrame,
-			const SPtr<Texture>& sceneDepth, const SPtr<RenderTarget>& destination);
+			const SPtr<Texture>& velocity, const SPtr<Texture>& sceneDepth, const Vector2& jitter,
+			float exposure, const SPtr<RenderTarget>& destination);
 
 		/**
 		 * Returns the material variation matching the provided parameters.
 		 *
-		 * @param[in]	msaa				True if the shader will operate on a multisampled surface. Note that previous
-		 *									and current frame color textures must be non-MSAA, regardless of this parameter.
-		 * @return							Requested variation of the material.
+		 * @param[in]	type		Type of filter to use.
+		 * @param[in]	velocity	True if the filter will have access to a buffer containing per-pixel velocities.
+		 * @param[in]	msaa		True if the shader will operate on a multisampled surface. Note that previous
+		 *							and current frame color textures must be non-MSAA, regardless of this parameter.
+		 * @return					Requested variation of the material.
 		 */
-		static SSRResolveMat* getVariation(bool msaa);
+		static TemporalFilteringMat* getVariation(TemporalFilteringType type, bool velocity, bool msaa);
 
 	private:
-		SPtr<GpuParamBlockBuffer> mSSRParamBuffer;
+		SPtr<GpuParamBlockBuffer> mParamBuffer;
 		SPtr<GpuParamBlockBuffer> mTemporalParamBuffer;
 
 		GpuParamTexture mSceneColorTexture;
 		GpuParamTexture mPrevColorTexture;
 		GpuParamTexture mSceneDepthTexture;
-		GpuParamTexture mEyeAdaptationTexture;
+		GpuParamTexture mVelocityTexture;
+
+		bool mHasVelocityTexture = false;
 	};
 
 	BS_PARAM_BLOCK_BEGIN(EncodeDepthParamDef)

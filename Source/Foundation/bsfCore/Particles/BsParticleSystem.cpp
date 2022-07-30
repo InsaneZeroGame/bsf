@@ -443,19 +443,19 @@ namespace bs
 
 	CoreSyncData ParticleSystem::syncToCore(FrameAlloc* allocator)
 	{
-		UINT32 size = rttiGetElemSize(getCoreDirtyFlags());
-		size += coreSyncGetElemSize((SceneActor&)*this);
-		size += coreSyncGetElemSize(mSettings);
-		size += coreSyncGetElemSize(mGpuSimulationSettings);
-		size += rttiGetElemSize(mLayer);
+		UINT32 size = rtti_size(getCoreDirtyFlags()).bytes;
+		size += csync_size((SceneActor&)*this);
+		size += csync_size(mSettings);
+		size += csync_size(mGpuSimulationSettings);
+		size += rtti_size(mLayer).bytes;
 
 		UINT8* data = allocator->alloc(size);
-		char* dataPtr = (char*)data;
-		dataPtr = rttiWriteElem(getCoreDirtyFlags(), dataPtr);
-		dataPtr = coreSyncWriteElem((SceneActor&)*this, dataPtr);
-		dataPtr = coreSyncWriteElem(mSettings, dataPtr);
-		dataPtr = coreSyncWriteElem(mGpuSimulationSettings, dataPtr);
-		dataPtr = rttiWriteElem(mLayer, dataPtr);
+		Bitstream stream(data, size);
+		rtti_write(getCoreDirtyFlags(), stream);
+		csync_write((SceneActor&)*this, stream);
+		csync_write(mSettings, stream);
+		csync_write(mGpuSimulationSettings, stream);
+		rtti_write(mLayer, stream);
 
 		return CoreSyncData(data, size);
 	}
@@ -525,16 +525,16 @@ namespace bs
 
 		void ParticleSystem::syncToCore(const CoreSyncData& data)
 		{
-			char* dataPtr = (char*)data.getBuffer();
+			Bitstream stream((uint8_t*)data.getBuffer(), data.getBufferSize());
 
 			UINT32 dirtyFlags = 0;
 			const bool oldIsActive = mActive;
 
-			dataPtr = rttiReadElem(dirtyFlags, dataPtr);
-			dataPtr = coreSyncReadElem((SceneActor&)*this, dataPtr);
-			dataPtr = coreSyncReadElem(mSettings, dataPtr);
-			dataPtr = coreSyncReadElem(mGpuSimulationSettings, dataPtr);
-			dataPtr = rttiReadElem(mLayer, dataPtr);
+			rtti_read(dirtyFlags, stream);
+			csync_read((SceneActor&)*this, stream);
+			csync_read(mSettings, stream);
+			csync_read(mGpuSimulationSettings, stream);
+			rtti_read(mLayer, stream);
 			
 			constexpr UINT32 updateEverythingFlag = (UINT32)ActorDirtyFlag::Everything
 				| (UINT32)ActorDirtyFlag::Active

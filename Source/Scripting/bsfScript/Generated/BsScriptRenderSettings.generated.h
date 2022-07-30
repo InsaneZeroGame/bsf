@@ -15,11 +15,14 @@
 #include "../../../Foundation/bsfCore/Renderer/BsRenderSettings.h"
 #include "../../../Foundation/bsfCore/Renderer/BsRenderSettings.h"
 #include "../../../Foundation/bsfCore/Renderer/BsRenderSettings.h"
+#include "../../../Foundation/bsfCore/Renderer/BsRenderSettings.h"
+#include "../../../Foundation/bsfCore/Renderer/BsRenderSettings.h"
+#include "../../../Foundation/bsfCore/Renderer/BsRenderSettings.h"
+#include "../../../Foundation/bsfCore/Renderer/BsRenderSettings.h"
 
+namespace bs { struct RenderSettings; }
 namespace bs
 {
-	struct RenderSettings;
-
 	class BS_SCR_BE_EXPORT ScriptRenderSettings : public TScriptReflectable<ScriptRenderSettings, RenderSettings>
 	{
 	public:
@@ -31,6 +34,10 @@ namespace bs
 
 	private:
 		static void Internal_RenderSettings(MonoObject* managedInstance);
+		static MonoObject* Internal_getdepthOfField(ScriptRenderSettings* thisPtr);
+		static void Internal_setdepthOfField(ScriptRenderSettings* thisPtr, MonoObject* value);
+		static MonoObject* Internal_getchromaticAberration(ScriptRenderSettings* thisPtr);
+		static void Internal_setchromaticAberration(ScriptRenderSettings* thisPtr, MonoObject* value);
 		static bool Internal_getenableAutoExposure(ScriptRenderSettings* thisPtr);
 		static void Internal_setenableAutoExposure(ScriptRenderSettings* thisPtr, bool value);
 		static MonoObject* Internal_getautoExposure(ScriptRenderSettings* thisPtr);
@@ -43,8 +50,6 @@ namespace bs
 		static void Internal_setwhiteBalance(ScriptRenderSettings* thisPtr, MonoObject* value);
 		static MonoObject* Internal_getcolorGrading(ScriptRenderSettings* thisPtr);
 		static void Internal_setcolorGrading(ScriptRenderSettings* thisPtr, MonoObject* value);
-		static MonoObject* Internal_getdepthOfField(ScriptRenderSettings* thisPtr);
-		static void Internal_setdepthOfField(ScriptRenderSettings* thisPtr, MonoObject* value);
 		static MonoObject* Internal_getambientOcclusion(ScriptRenderSettings* thisPtr);
 		static void Internal_setambientOcclusion(ScriptRenderSettings* thisPtr, MonoObject* value);
 		static MonoObject* Internal_getscreenSpaceReflections(ScriptRenderSettings* thisPtr);
@@ -53,6 +58,12 @@ namespace bs
 		static void Internal_setbloom(ScriptRenderSettings* thisPtr, MonoObject* value);
 		static MonoObject* Internal_getscreenSpaceLensFlare(ScriptRenderSettings* thisPtr);
 		static void Internal_setscreenSpaceLensFlare(ScriptRenderSettings* thisPtr, MonoObject* value);
+		static MonoObject* Internal_getfilmGrain(ScriptRenderSettings* thisPtr);
+		static void Internal_setfilmGrain(ScriptRenderSettings* thisPtr, MonoObject* value);
+		static MonoObject* Internal_getmotionBlur(ScriptRenderSettings* thisPtr);
+		static void Internal_setmotionBlur(ScriptRenderSettings* thisPtr, MonoObject* value);
+		static MonoObject* Internal_gettemporalAA(ScriptRenderSettings* thisPtr);
+		static void Internal_settemporalAA(ScriptRenderSettings* thisPtr, MonoObject* value);
 		static bool Internal_getenableFXAA(ScriptRenderSettings* thisPtr);
 		static void Internal_setenableFXAA(ScriptRenderSettings* thisPtr, bool value);
 		static float Internal_getexposureScale(ScriptRenderSettings* thisPtr);
@@ -65,6 +76,8 @@ namespace bs
 		static void Internal_setenableLighting(ScriptRenderSettings* thisPtr, bool value);
 		static bool Internal_getenableShadows(ScriptRenderSettings* thisPtr);
 		static void Internal_setenableShadows(ScriptRenderSettings* thisPtr, bool value);
+		static bool Internal_getenableVelocityBuffer(ScriptRenderSettings* thisPtr);
+		static void Internal_setenableVelocityBuffer(ScriptRenderSettings* thisPtr, bool value);
 		static MonoObject* Internal_getshadowSettings(ScriptRenderSettings* thisPtr);
 		static void Internal_setshadowSettings(ScriptRenderSettings* thisPtr, MonoObject* value);
 		static bool Internal_getenableIndirectLighting(ScriptRenderSettings* thisPtr);

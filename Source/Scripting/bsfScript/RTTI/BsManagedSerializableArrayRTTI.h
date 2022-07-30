@@ -4,6 +4,7 @@
 
 #include "BsScriptEnginePrerequisites.h"
 #include "Reflection/BsRTTIType.h"
+#include "Reflection/BsRTTIPlain.h"
 #include "Scene/BsGameObjectManager.h"
 #include "Serialization/BsManagedSerializableArray.h"
 #include "Serialization/BsScriptAssemblyManager.h"

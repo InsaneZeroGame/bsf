@@ -10,11 +10,11 @@
 #include "Math/BsConvexVolume.h"
 #include "Shading/BsLightGrid.h"
 #include "Shading/BsShadowRendering.h"
-#include "BsRendererView.h"
 #include "BsRendererRenderable.h"
 #include "BsRenderCompositor.h"
 #include "BsRendererParticles.h"
 #include "BsRendererDecal.h"
+#include "Renderer/BsRenderer.h"
 
 namespace bs { namespace ct
 {
@@ -33,6 +33,7 @@ namespace bs { namespace ct
 		BS_PARAM_BLOCK_ENTRY(Matrix4, gMatProj)
 		BS_PARAM_BLOCK_ENTRY(Matrix4, gMatInvProj)
 		BS_PARAM_BLOCK_ENTRY(Matrix4, gMatInvViewProj)
+		BS_PARAM_BLOCK_ENTRY(Matrix4, gMatPrevViewProj)
 		BS_PARAM_BLOCK_ENTRY(Matrix4, gMatScreenToWorld)
 		BS_PARAM_BLOCK_ENTRY(Matrix4, gNDCToPrevNDC)
 		BS_PARAM_BLOCK_ENTRY(Vector2, gDeviceZToWorldZ)
@@ -128,17 +129,20 @@ namespace bs { namespace ct
 		 */
 		bool encodeDepth : 1;
 
+		/** If true the view will only be rendered when requested, otherwise it will be rendered every frame. */
+		bool onDemand : 1;
+
 		/**
 		 * Controls at which position to start encoding depth, in view space. Only relevant with @p encodeDepth is enabled.
 		 * Depth will be linearly interpolated between this value and @p depthEncodeFar.
 		 */
-		float depthEncodeNear;
+		float depthEncodeNear = 0.0f;
 
 		/**
 		 * Controls at which position to stop encoding depth, in view space. Only relevant with @p encodeDepth is enabled.
 		 * Depth will be linearly interpolated between @p depthEncodeNear and this value.
 		 */
-		float depthEncodeFar;
+		float depthEncodeFar = 0.0f;
 
 		UINT64 visibleLayers;
 		ConvexVolume cullFrustum;
@@ -182,6 +186,8 @@ namespace bs { namespace ct
 
 		Matrix4 viewProjTransform;
 		Matrix4 prevViewProjTransform;
+		Matrix4 projTransformNoAA;
+		Vector2 temporalJitter { BsZero };
 		UINT32 frameIdx;
 
 		RendererViewTargetData target;
@@ -217,6 +223,22 @@ namespace bs { namespace ct
 		Vector<Camera*> cameras;
 	};
 
+	/** Returns the reason why is a RendererView being redrawn. */
+	enum class RendererViewRedrawReason
+	{
+		/** This particular view isn't on-demand and is redrawn every frame. */
+		PerFrame,
+
+		/** Draws on demand and on-demand drawing was triggered this frame. */
+		OnDemandThisFrame,
+
+		/**
+		 * Draws on demand and on-demand drawing was triggered during an earlier frame but a multi-frame effect is
+		 * requiring the view to get redrawn in later frames.
+		 */
+		OnDemandLingering
+	};
+
 	/** Contains information about a single view into the scene, used by the renderer. */
 	class RendererView
 	{
@@ -244,7 +266,7 @@ namespace bs { namespace ct
 		Camera* getSceneCamera() const { return mCamera; }
 
 		/** Prepares render targets for rendering. When done call endFrame(). */
-		void beginFrame();
+		void beginFrame(const FrameInfo& frameInfo);
 
 		/** Ends rendering and frees any acquired resources. */
 		void endFrame();
@@ -271,7 +293,7 @@ namespace bs { namespace ct
 		
 		/** Returns the compositor in charge of rendering for this view. */
 		const RenderCompositor& getCompositor() const { return mCompositor; }
-
+		
 		/**
 		 * Populates view render queues by determining visible renderable objects.
 		 *
@@ -362,7 +384,7 @@ namespace bs { namespace ct
 		/**
 		 * Inserts all visible renderable elements into render queues. Assumes visibility has been calculated beforehand
 		 * by calling determineVisible(). After the call render elements can be retrieved from the queues using
-		 * getOpqueQueue or getTransparentQueue() calls.
+		 * getOpaqueQueue or getTransparentQueue() calls.
 		 */
 		void queueRenderElements(const SceneInfo& sceneInfo);
 
@@ -393,6 +415,9 @@ namespace bs { namespace ct
 		/** Updates the light grid used for forward rendering. */
 		void updateLightGrid(const VisibleLightData& visibleLightData, const VisibleReflProbeData& visibleReflProbeData);
 
+		/** Returns a context that reflects the state of the view as it changes during rendering. */
+		const RendererViewContext& getContext() const { return mContext; }
+
 		/**
 		 * Returns a value that can be used for transforming x, y coordinates from NDC into UV coordinates that can be used
 		 * for sampling a texture projected on the view.
@@ -404,9 +429,53 @@ namespace bs { namespace ct
 		/** Returns an index of this view within the parent view group. */
 		UINT32 getViewIdx() const { return mViewIdx; }
 
+		/** Determines if a view should be rendered this frame. */
+		bool shouldDraw() const;
+
+		/** Determines if view's 3D geometry should be rendered this frame. */
+		bool shouldDraw3D() const { return !mRenderSettings->overlayOnly && shouldDraw(); }
+
+		/** Returns true if the view should write to the velocity buffer. */
+		bool requiresVelocityWrites() const;
+		
+		/**
+		 * Determines if any async operations have completed executing and finalizes them. Should be called once
+		 * per frame.
+		 */
+		void updateAsyncOperations();
+
+		/**
+		 * Returns the reason that explains why is the view getting redrawn this frame. Only relevant if shouldDraw() returned
+		 * true previously during the frame.
+		 */
+		RendererViewRedrawReason getRedrawReason() const;
+
+		/**
+		 * Gets the current exposure of the view, used for transforming scene light values from HDR in a range that can be
+		 * displayed on a display device.
+		 */
+		float getCurrentExposure() const;
+
 		/** Assigns a view index to the view. To be called by the parent view group when the view is added to it. */
 		void _setViewIdx(UINT32 viewIdx) { mViewIdx = viewIdx; }
 
+		/** Lets an on-demand view know that it should be redrawn this frame. */
+		void _notifyNeedsRedraw();
+		
+		/**
+		 * Notifies the view that the render target the compositor is rendering to has changed. Note that this does not
+		 * mean the final render target, rather the current intermediate target as set by the renderer during the
+		 * rendering of a single frame. This should be set to null if the renderer is not currently rendering the
+		 * view.
+		 */
+		void _notifyCompositorTargetChanged(const SPtr<RenderTarget>& target) const { mContext.currentTarget = target; }
+
+		/**
+		 * Notifies the view that a new average luminance is being calculated on the provided command buffer. The results
+		 * will be read from the provided texture when the command buffer finishes executing.
+		 */
+		void _notifyLuminanceUpdated(UINT64 frameIdx, SPtr<CommandBuffer> cb, SPtr<PooledRenderTexture> texture) const;
+		
 		/**
 		 * Extracts the necessary values from the projection matrix that allow you to transform device Z value (range [0, 1]
 		 * into view Z value.
@@ -433,7 +502,19 @@ namespace bs { namespace ct
 		 */
 		static Vector2 getNDCZToDeviceZ();
 	private:
+		struct LuminanceUpdate
+		{
+			LuminanceUpdate(UINT64 frameIdx, SPtr<CommandBuffer> commandBuffer, SPtr<PooledRenderTexture> outputTexture)
+				: frameIdx(frameIdx), commandBuffer(std::move(commandBuffer)), outputTexture(std::move(outputTexture))
+			{ }
+
+			UINT64 frameIdx;
+			SPtr<CommandBuffer> commandBuffer;
+			SPtr<PooledRenderTexture> outputTexture;
+		};
+		
 		RendererViewProperties mProperties;
+		mutable RendererViewContext mContext;
 		Camera* mCamera;
 
 		SPtr<RenderQueue> mDeferredOpaqueQueue;
@@ -449,6 +530,24 @@ namespace bs { namespace ct
 		VisibilityInfo mVisibility;
 		LightGrid mLightGrid;
 		UINT32 mViewIdx;
+
+		// Temporal anti-aliasing
+		UINT32 mTemporalPositionIdx;
+
+		// On-demand drawing
+		bool mRedrawThisFrame = false;
+		float mRedrawForSeconds = 0.0f;
+		UINT32 mRedrawForFrames = 0;
+		UINT64 mWaitingOnAutoExposureFrame = std::numeric_limits<UINT64>::max();
+		mutable Vector<LuminanceUpdate> mLuminanceUpdates;
+
+		// Exposure
+		float mPreviousEyeAdaptation = 0.0f;
+		float mCurrentEyeAdaptation = 0.0f;
+
+		// Current frame info
+		FrameTimings mFrameTimings;
+		bool mAsyncAnim = false;
 	};
 
 	/** Contains one or multiple RendererView%s that are in some way related. */

@@ -586,6 +586,14 @@ namespace bs { namespace ct
 		cbm.flushTransferBuffers(cmdBuffer->getDeviceIdx());
 
 		cmdBuffer->submit(syncMask);
+
+		if(cmdBuffer == mMainCommandBuffer.get())
+			mMainCommandBuffer = std::static_pointer_cast<VulkanCommandBuffer>(CommandBuffer::create(GQT_GRAPHICS));
+	}
+
+	SPtr<CommandBuffer> VulkanRenderAPI::getMainCommandBuffer() const
+	{
+		return mMainCommandBuffer;
 	}
 
 	void VulkanRenderAPI::convertProjectionMatrix(const Matrix4& matrix, Matrix4& dest)

@@ -99,6 +99,13 @@ shader Surface
 			#endif
 			#endif
 		};
+		
+		// Velocity
+		target	
+		{
+			enabled = true;
+			writemask = empty;
+		};
 	};
 	
 	depth
@@ -183,7 +190,7 @@ shader Surface
 			float2 gUVTile = { 1.0f, 1.0f };
 			
 			#if BLEND_MODE == 3
-				[color]
+				[color][hdr]
 				float3 gEmissiveColor = { 1.0f, 1.0f, 1.0f };
 			#endif
 			

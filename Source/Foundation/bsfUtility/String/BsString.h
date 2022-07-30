@@ -3,8 +3,6 @@
 #pragma once
 
 #include "Allocators/BsMemoryAllocator.h"
-#include "Math/BsRadian.h"
-
 #include <string>
 
 namespace bs
@@ -78,12 +76,12 @@ namespace bs
 		std::ios::fmtflags flags = std::ios::fmtflags(0) );
 
 	/** Converts a Radian to a string. */
-	BS_UTILITY_EXPORT WString toWString(Radian val, unsigned short precision = 6,
+	BS_UTILITY_EXPORT WString toWString(const Radian& val, unsigned short precision = 6,
 		unsigned short width = 0, char fill = ' ',
 		std::ios::fmtflags flags = std::ios::fmtflags(0) );
 
 	/** Converts a Degree to a string. */
-	BS_UTILITY_EXPORT WString toWString(Degree val, unsigned short precision = 6,
+	BS_UTILITY_EXPORT WString toWString(const Degree& val, unsigned short precision = 6,
 		unsigned short width = 0, char fill = ' ',
 		std::ios::fmtflags flags = std::ios::fmtflags(0) );
 
@@ -201,12 +199,12 @@ namespace bs
 		std::ios::fmtflags flags = std::ios::fmtflags(0) );
 
 	/**	Converts a Radian to a string. */
-	BS_UTILITY_EXPORT String toString(Radian val, unsigned short precision = 6,
+	BS_UTILITY_EXPORT String toString(const Radian& val, unsigned short precision = 6,
 		unsigned short width = 0, char fill = ' ',
 		std::ios::fmtflags flags = std::ios::fmtflags(0) );
 
 	/**	Converts a Degree to a string. */
-	BS_UTILITY_EXPORT String toString(Degree val, unsigned short precision = 6,
+	BS_UTILITY_EXPORT String toString(const Degree& val, unsigned short precision = 6,
 		unsigned short width = 0, char fill = ' ',
 		std::ios::fmtflags flags = std::ios::fmtflags(0) );
 
@@ -831,114 +829,6 @@ namespace bs
 	void BS_UTILITY_EXPORT __string_throwDataOverflowException();
 
 	/** @} */
-	/** @cond SPECIALIZATIONS */
-
-	/**
-	 * RTTIPlainType specialization for String that allows strings be serialized as value types.
-	 * 			
-	 * @see		RTTIPlainType
-	 */
-	template<> struct RTTIPlainType<String>
-	{	
-		enum { id = 20 }; enum { hasDynamicSize = 1 };
-
-		static void toMemory(const String& data, char* memory)
-		{
-			UINT32 size = getDynamicSize(data);
-
-			memcpy(memory, &size, sizeof(UINT32));
-			memory += sizeof(UINT32);
-			size -= sizeof(UINT32);
-			memcpy(memory, data.data(), size);
-		}
-
-		static UINT32 fromMemory(String& data, char* memory)
-		{
-			UINT32 size;
-			memcpy(&size, memory, sizeof(UINT32));
-			memory += sizeof(UINT32);
-
-			UINT32 stringSize = size - sizeof(UINT32);
-			char* buffer = (char*)bs_alloc(stringSize + 1);
-			memcpy(buffer, memory, stringSize);
-			buffer[stringSize] = '\0';
-			data = String(buffer);
-
-			bs_free(buffer);
-
-			return size;
-		}
-
-		static UINT32 getDynamicSize(const String& data)	
-		{
-			UINT64 dataSize = data.size() * sizeof(String::value_type) + sizeof(UINT32);
-
-#if BS_DEBUG_MODE
-			if(dataSize > std::numeric_limits<UINT32>::max())
-			{
-				__string_throwDataOverflowException();
-			}
-#endif
-
-			return (UINT32)dataSize;
-		}	
-	};
-
-	/**
-	 * RTTIPlainType specialization for WString that allows strings be serialized as value types.
-	 * 			
-	 * @see		RTTIPlainType
-	 */
-	template<> struct RTTIPlainType<WString>
-	{	
-		enum { id = TID_WString }; enum { hasDynamicSize = 1 };
-
-		static void toMemory(const WString& data, char* memory)
-		{
-			UINT32 size = getDynamicSize(data);
-
-			memcpy(memory, &size, sizeof(UINT32));
-			memory += sizeof(UINT32);
-			size -= sizeof(UINT32);
-			memcpy(memory, data.data(), size);
-		}
-
-		static UINT32 fromMemory(WString& data, char* memory)
-		{
-			UINT32 size;
-			memcpy(&size, memory, sizeof(UINT32));
-			memory += sizeof(UINT32);
-
-			UINT32 stringSize = size - sizeof(UINT32);
-			WString::value_type* buffer = (WString::value_type*)bs_alloc(stringSize + sizeof(WString::value_type));
-			memcpy(buffer, memory, stringSize);
-
-			UINT32 numChars =  stringSize / sizeof(WString::value_type);
-			buffer[numChars] = L'\0';
-
-			data = WString(buffer);
-
-			bs_free(buffer);
-
-			return size;
-		}
-
-		static UINT32 getDynamicSize(const WString& data)	
-		{
-			UINT64 dataSize = data.size() * sizeof(WString::value_type) + sizeof(UINT32);
-
-#if BS_DEBUG_MODE
-			if(dataSize > std::numeric_limits<UINT32>::max())
-			{
-				__string_throwDataOverflowException();
-			}
-#endif
-
-			return (UINT32)dataSize;
-		}	
-	};
-
-	/** @endcond */
 	/** @} */
 }
 

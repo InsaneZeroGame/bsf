@@ -11,7 +11,7 @@ namespace bs
 	 */
 
 	/// <summary>
-	/// Contains information about a single variation of a Shader. Each variation can have a separate set of #defines that
+	/// Contains information about a single variation of a Shader. Each variation can have a separate set of #defines that 
 	/// control shader compilation.
 	/// </summary>
 	[ShowInInspector]
@@ -32,7 +32,7 @@ namespace bs
 		}
 
 		/// <summary>
-		/// Returns the value of a signed integer parameter with the specified name. Returns 0 if the parameter cannot be  found.
+		/// Returns the value of a signed integer parameter with the specified name. Returns 0 if the parameter cannot be found.
 		/// </summary>
 		public int GetInt(string name)
 		{
@@ -56,7 +56,7 @@ namespace bs
 		}
 
 		/// <summary>
-		/// Returns the value of a boolean parameter with the specified name. Returns false if the parameter cannot be  found.
+		/// Returns the value of a boolean parameter with the specified name. Returns false if the parameter cannot be found.
 		/// </summary>
 		public bool GetBool(string name)
 		{
@@ -64,7 +64,7 @@ namespace bs
 		}
 
 		/// <summary>
-		/// Sets the value of the parameter for the provided name. Any previous value for a parameter with the same name  will be
+		/// Sets the value of the parameter for the provided name. Any previous value for a parameter with the same name will be 
 		/// overwritten.
 		/// </summary>
 		public void SetInt(string name, int value)
@@ -73,7 +73,7 @@ namespace bs
 		}
 
 		/// <summary>
-		/// Sets the value of the parameter for the provided name. Any previous value for a parameter with the same name  will be
+		/// Sets the value of the parameter for the provided name. Any previous value for a parameter with the same name will be 
 		/// overwritten.
 		/// </summary>
 		public void SetUInt(string name, int value)
@@ -82,7 +82,7 @@ namespace bs
 		}
 
 		/// <summary>
-		/// Sets the value of the parameter for the provided name. Any previous value for a parameter with the same name  will be
+		/// Sets the value of the parameter for the provided name. Any previous value for a parameter with the same name will be 
 		/// overwritten.
 		/// </summary>
 		public void SetFloat(string name, float value)
@@ -91,7 +91,7 @@ namespace bs
 		}
 
 		/// <summary>
-		/// Sets the value of the parameter for the provided name. Any previous value for a parameter with the same name  will be
+		/// Sets the value of the parameter for the provided name. Any previous value for a parameter with the same name will be 
 		/// overwritten.
 		/// </summary>
 		public void SetBool(string name, bool value)
@@ -103,6 +103,12 @@ namespace bs
 		public void RemoveParam(string paramName)
 		{
 			Internal_removeParam(mCachedPtr, paramName);
+		}
+
+		/// <summary>Checks if the variation has a parameter with the specified name.</summary>
+		public bool HasParam(string paramName)
+		{
+			return Internal_hasParam(mCachedPtr, paramName);
 		}
 
 		/// <summary>Removes all parameters.</summary>
@@ -131,6 +137,8 @@ namespace bs
 		private static extern void Internal_setBool(IntPtr thisPtr, string name, bool value);
 		[MethodImpl(MethodImplOptions.InternalCall)]
 		private static extern void Internal_removeParam(IntPtr thisPtr, string paramName);
+		[MethodImpl(MethodImplOptions.InternalCall)]
+		private static extern bool Internal_hasParam(IntPtr thisPtr, string paramName);
 		[MethodImpl(MethodImplOptions.InternalCall)]
 		private static extern void Internal_clearParams(IntPtr thisPtr);
 		[MethodImpl(MethodImplOptions.InternalCall)]

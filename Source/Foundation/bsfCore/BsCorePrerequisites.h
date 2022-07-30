@@ -245,6 +245,11 @@ namespace bs
 	namespace ct { class TYPE; }						\
 	template<> struct CoreThreadType<TYPE> { typedef ct::TYPE Type; };
 
+#define CORE_OBJECT_FORWARD_DECLARE_STRUCT(TYPE)		\
+	struct TYPE;										\
+	namespace ct { struct TYPE; }						\
+	template<> struct CoreThreadType<TYPE> { typedef ct::TYPE Type; };
+
 	CORE_OBJECT_FORWARD_DECLARE(IndexBuffer)
 	CORE_OBJECT_FORWARD_DECLARE(VertexBuffer)
 	CORE_OBJECT_FORWARD_DECLARE(GpuBuffer)
@@ -279,6 +284,9 @@ namespace bs
 	CORE_OBJECT_FORWARD_DECLARE(VectorField)
 	CORE_OBJECT_FORWARD_DECLARE(Skybox)
 	CORE_OBJECT_FORWARD_DECLARE(Decal)
+	CORE_OBJECT_FORWARD_DECLARE_STRUCT(DepthOfFieldSettings)
+	CORE_OBJECT_FORWARD_DECLARE_STRUCT(ChromaticAberrationSettings)
+	CORE_OBJECT_FORWARD_DECLARE_STRUCT(RenderSettings)
 
 	class Collider;
 	class Rigidbody;
@@ -648,6 +656,18 @@ namespace bs
 		TID_ShaderVariationParamInfo = 1196,
 		TID_ShaderVariationParamValue = 1197,
 		TID_ScreenSpaceLensFlareSettings = 1198,
+		TID_ChromaticAberrationSettings = 1199,
+		TID_FilmGrainSettings = 1200,
+		TID_AutoExposureSettings = 1201,
+		TID_TonemappingSettings = 1202,
+		TID_WhiteBalanceSettings = 1203,
+		TID_ColorGradingSettings = 1204,
+		TID_DepthOfFieldSettings = 1205,
+		TID_AmbientOcclusionSettings = 1206,
+		TID_ScreenSpaceReflectionsSettings = 1207,
+		TID_ShadowSettings = 1208,
+		TID_MotionBlurSettings = 1209,
+		TID_TemporalAASettings = 1210,
 
 		// Moved from Engine layer
 		TID_CCamera = 30000,
@@ -657,14 +677,6 @@ namespace bs
 		TID_Renderable = 30004,
 		TID_Light = 30011,
 		TID_CLight = 30012,
-		TID_AutoExposureSettings = 30016,
-		TID_TonemappingSettings = 30017,
-		TID_WhiteBalanceSettings = 30018,
-		TID_ColorGradingSettings = 30019,
-		TID_DepthOfFieldSettings = 30020,
-		TID_AmbientOcclusionSettings = 30021,
-		TID_ScreenSpaceReflectionsSettings = 30022,
-		TID_ShadowSettings = 30023,
 	};
 }
 
@@ -828,7 +840,10 @@ namespace bs
 		 * Used when deserializing resources. Lets the system know not to discard any intermediate resource data that might
 		 * be required if the resource needs to be serialized.
 		 */
-		SF_KeepResourceSourceData = 1
+		SF_KeepResourceSourceData = 1 << 0,
+
+		/** Only serializes elements with network replication flag enabled. */
+		SF_ReplicableOnly = 1 << 1
 	};
 
 	/** Helper type that can contain either a component or scene actor version of an object. */
@@ -893,6 +908,7 @@ namespace bs
 	BS_LOG_CATEGORY(FreeImageImporter, 36)
 	BS_LOG_CATEGORY(Script, 37)
 	BS_LOG_CATEGORY(Importer, 38)
+	BS_LOG_CATEGORY(Network, 39)
 }
 
 #include "Utility/BsCommonTypes.h"

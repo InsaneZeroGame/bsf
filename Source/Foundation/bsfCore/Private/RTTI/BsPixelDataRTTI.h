@@ -3,8 +3,9 @@
 #pragma once
 
 #include "BsCorePrerequisites.h"
-#include "Image/BsPixelData.h"
 #include "Reflection/BsRTTIType.h"
+#include "Reflection/BsRTTIPlain.h"
+#include "Image/BsPixelData.h"
 #include "FileSystem/BsDataStream.h"
 
 namespace bs
@@ -37,7 +38,7 @@ namespace bs
 		{
 			size = obj->getConsecutiveSize();
 
-			return bs_shared_ptr_new<MemoryDataStream>(obj->getData(), size, false);
+			return bs_shared_ptr_new<MemoryDataStream>(obj->getData(), size);
 		}
 
 		void setData(PixelData* obj, const SPtr<DataStream>& value, UINT32 size)

@@ -189,12 +189,12 @@ namespace bs
 		mMeshes = meshes;
 	}
 
-	bool DebugDrawRenderer::check(const Camera& camera)
+	RendererExtensionRequest DebugDrawRenderer::check(const Camera& camera)
 	{
-		return true;
+		return mMeshes.empty() ? RendererExtensionRequest::RenderIfTargetDirty : RendererExtensionRequest::ForceRender;
 	}
 
-	void DebugDrawRenderer::render(const Camera& camera)
+	void DebugDrawRenderer::render(const Camera& camera, const RendererViewContext& viewContext)
 	{
 		SPtr<RenderTarget> renderTarget = camera.getViewport()->getTarget();
 		if (renderTarget == nullptr)

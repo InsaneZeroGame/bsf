@@ -17,7 +17,8 @@ static const char* sMiniDumpName = "minidump.dmp";
 
 namespace bs
 {
-	CrashHandler::CrashHandler()
+	CrashHandler::CrashHandler(const CrashHandlerSettings& settings) :
+		mSettings(settings)
 	{
 		m = bs_new<Data>();
 	}
@@ -467,10 +468,23 @@ namespace bs
 	void CrashHandler::reportCrash(const String& type, const String& description, const String& function,
 		const String& file, UINT32 line) const
 	{
+		if(mSettings.onBeforeReportCrash)
+		{
+			if(mSettings.onBeforeReportCrash(type, description, function, file, line))
+				return;
+		}
+
 		// Win32 debug methods are not thread safe
 		Lock lock(m->mutex);
 
 		logErrorAndStackTrace(type, description, function, file, line);
+
+		if(mSettings.onCrashPrintedToLog)
+		{
+			if(mSettings.onCrashPrintedToLog())
+				return;
+		}
+
 		saveCrashLog();
 
 		win32_writeMiniDump(getCrashFolder() + String(sMiniDumpName), nullptr);
@@ -483,6 +497,12 @@ namespace bs
 
 	int CrashHandler::reportCrash(void* exceptionDataPtr) const
 	{
+		if(mSettings.onBeforeWindowsSEHReportCrash)
+		{
+			if(mSettings.onBeforeWindowsSEHReportCrash(exceptionDataPtr))
+				return EXCEPTION_EXECUTE_HANDLER;
+		}
+
 		EXCEPTION_POINTERS* exceptionData = (EXCEPTION_POINTERS*)exceptionDataPtr;
 
 		// Win32 debug methods are not thread safe
@@ -493,6 +513,13 @@ namespace bs
 
 		logErrorAndStackTrace(win32_getExceptionMessage(exceptionData->ExceptionRecord),
 			win32_getStackTrace(*exceptionData->ContextRecord, 0));
+
+		if(mSettings.onCrashPrintedToLog)
+		{
+			if(mSettings.onCrashPrintedToLog())
+				return EXCEPTION_EXECUTE_HANDLER;
+		}
+
 		saveCrashLog();
 
 		win32_writeMiniDump(getCrashFolder() + String(sMiniDumpName), exceptionData);

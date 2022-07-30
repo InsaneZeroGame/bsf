@@ -4,6 +4,7 @@
 
 #include "BsCorePrerequisites.h"
 #include "Reflection/BsRTTIType.h"
+#include "Reflection/BsRTTIPlain.h"
 #include "BsCoreApplication.h"
 #include "Mesh/BsMesh.h"
 #include "Animation/BsSkeleton.h"
@@ -32,7 +33,7 @@ namespace bs
 			SPtr<MeshData> meshData = obj->allocBuffer();
 
 			obj->readData(meshData);
-			gCoreThread().submit(true);
+			gCoreThread().submitAll(true);
 
 			return meshData;
 		}

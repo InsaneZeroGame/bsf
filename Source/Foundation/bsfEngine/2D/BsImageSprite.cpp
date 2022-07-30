@@ -31,7 +31,7 @@ namespace bs
 		if(useScale9Grid)
 			numQuads = 9;
 
-		SpriteRenderElement& renderElem = mCachedRenderElements[0];
+		SpriteRenderElementData& renderElem = mCachedRenderElements[0];
 		{
 			UINT32 newNumQuads = numQuads;
 			if(newNumQuads != renderElem.numQuads)
@@ -61,7 +61,8 @@ namespace bs
 			if(animated)
 				matInfo.spriteTexture = desc.texture;
 
-			renderElem.material = SpriteManager::instance().getImageMaterial(desc.transparent, animated);
+			renderElem.material = SpriteManager::instance().getImageMaterial(
+				desc.transparent ? SpriteMaterialTransparency::Alpha : SpriteMaterialTransparency::Opaque, animated);
 		}
 
 		for(UINT32 i = 0; i < numQuads; i++)

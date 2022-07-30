@@ -2,6 +2,7 @@
 //*********** Licensed under the MIT license. See LICENSE.md for full terms. This notice is not to be removed. ***********//
 #include "Renderer/BsReflectionProbe.h"
 #include "Private/RTTI/BsReflectionProbeRTTI.h"
+#include "RTTI/BsMathRTTI.h"
 #include "Scene/BsSceneObject.h"
 #include "Image/BsTexture.h"
 #include "Renderer/BsRenderer.h"
@@ -197,16 +198,16 @@ namespace bs
 	CoreSyncData ReflectionProbe::syncToCore(FrameAlloc* allocator)
 	{
 		UINT32 size = 0;
-		size += rttiGetElemSize(getCoreDirtyFlags());
-		size += coreSyncGetElemSize((SceneActor&)*this);
-		size += coreSyncGetElemSize(*this);
+		size += rtti_size(getCoreDirtyFlags()).bytes;
+		size += csync_size((SceneActor&)*this);
+		size += csync_size(*this);
 
 		UINT8* buffer = allocator->alloc(size);
 
-		char* dataPtr = (char*)buffer;
-		dataPtr = rttiWriteElem(getCoreDirtyFlags(), dataPtr);
-		dataPtr = coreSyncWriteElem((SceneActor&)*this, dataPtr);
-		dataPtr = coreSyncWriteElem(*this, dataPtr);
+		Bitstream stream(buffer, size);
+		rtti_write(getCoreDirtyFlags(), stream);
+		csync_write((SceneActor&)*this, stream);
+		csync_write(*this, stream);
 
 		return CoreSyncData(buffer, size);
 	}
@@ -253,15 +254,15 @@ namespace bs
 
 	void ReflectionProbe::syncToCore(const CoreSyncData& data)
 	{
-		char* dataPtr = (char*)data.getBuffer();
+		Bitstream stream(data.getBuffer(), data.getBufferSize());
 
 		UINT32 dirtyFlags = 0;
 		bool oldIsActive = mActive;
 		ReflectionProbeType oldType = mType;
 
-		dataPtr = rttiReadElem(dirtyFlags, dataPtr);
-		dataPtr = coreSyncReadElem((SceneActor&)*this, dataPtr);
-		dataPtr = coreSyncReadElem(*this, dataPtr);
+		rtti_read(dirtyFlags, stream);
+		csync_read((SceneActor&)*this, stream);
+		csync_read(*this, stream);
 
 		updateBounds();
 

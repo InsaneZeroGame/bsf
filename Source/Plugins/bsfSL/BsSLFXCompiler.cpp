@@ -465,6 +465,15 @@ namespace bs
 
 					desc.setParameterAttribute(ident, attribute);
 				}
+
+				if ((entry.flags & Xsc::Reflection::Uniform::Flags::HDR) != 0)
+				{
+					SHADER_PARAM_ATTRIBUTE attribute;
+					attribute.nextParamIdx = (UINT32)-1;
+					attribute.type = ShaderParamAttributeType::HDR;
+
+					desc.setParameterAttribute(ident, attribute);
+				}
 			};
 
 			switch(entry.type)
@@ -2363,7 +2372,7 @@ cleanup:
 					hlslPassData.code = regex_replace(hlslPassData.code, attrRegex, "");
 
 					static const std::regex attr2Regex(
-						R"(\[\s*hideInInspector\s*\]|\[\s*name\s*\(".*"\)\s*\])");
+						R"(\[\s*hideInInspector\s*\]|\[\s*name\s*\(".*"\)\s*\]|\[\s*hdr\s*\])");
 					hlslPassData.code = regex_replace(hlslPassData.code, attr2Regex, "");
 
 					static const std::regex initializerRegex(

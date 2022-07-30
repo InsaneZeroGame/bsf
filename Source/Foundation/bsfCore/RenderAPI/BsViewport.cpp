@@ -145,12 +145,12 @@ namespace bs
 
 	CoreSyncData Viewport::syncToCore(FrameAlloc* allocator)
 	{
-		UINT32 size = coreSyncGetElemSize(*this);
+		UINT32 size = csync_size(*this);
 
 		UINT8* buffer = allocator->alloc(size);
+		Bitstream stream(buffer, size);
 
-		char* dataPtr = (char*)buffer;
-		dataPtr = coreSyncWriteElem(*this, dataPtr);
+		csync_write(*this, stream);
 
 		return CoreSyncData(buffer, size);
 	}
@@ -225,8 +225,8 @@ namespace bs
 
 	void Viewport::syncToCore(const CoreSyncData& data)
 	{
-		char* dataPtr = (char*)data.getBuffer();
-		coreSyncReadElem(*this, dataPtr);
+		Bitstream stream(data.getBuffer(), data.getBufferSize());
+		csync_read(*this, stream);
 	}
 	}
 }

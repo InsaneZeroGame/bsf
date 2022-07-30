@@ -375,6 +375,9 @@ namespace bs
 		case BuiltinTexture::Normal:
 			texturePath.append(TEXTURE_NORMAL_FILE);
 			break;
+		case BuiltinTexture::BokehFlare:
+			texturePath.append(u8"BokehHex.png.asset");
+			break;
 		}
 
 		return gResources().load<Texture>(texturePath);

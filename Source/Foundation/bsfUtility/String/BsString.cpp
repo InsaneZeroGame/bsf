@@ -165,13 +165,13 @@ namespace bs
 		return stream.str();
 	}
 
-	WString toWString(Radian val, unsigned short precision,
+	WString toWString(const Radian& val, unsigned short precision,
 		unsigned short width, char fill, std::ios::fmtflags flags)
 	{
 		return toWString(val.valueRadians(), precision, width, fill, flags);
 	}
 
-	WString toWString(Degree val, unsigned short precision,
+	WString toWString(const Degree& val, unsigned short precision,
 		unsigned short width, char fill, std::ios::fmtflags flags)
 	{
 		return toWString(val.valueDegrees(), precision, width, fill, flags);
@@ -365,7 +365,11 @@ namespace bs
 
 	String toString(const WString& source)
 	{
-		return String(source.begin(), source.end());
+		StringStream stream;
+		for (auto& entry : source)
+			stream << entry;
+
+		return stream.str();
 	}
 
 	String toString(const wchar_t* source)
@@ -399,13 +403,13 @@ namespace bs
 		return stream.str();
 	}
 
-	String toString(Radian val, unsigned short precision,
+	String toString(const Radian& val, unsigned short precision,
 		unsigned short width, char fill, std::ios::fmtflags flags)
 	{
 		return toString(val.valueRadians(), precision, width, fill, flags);
 	}
 
-	String toString(Degree val, unsigned short precision,
+	String toString(const Degree& val, unsigned short precision,
 		unsigned short width, char fill, std::ios::fmtflags flags)
 	{
 		return toString(val.valueDegrees(), precision, width, fill, flags);

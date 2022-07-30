@@ -32,44 +32,47 @@ namespace bs
 	 *  @{
 	 */
 
-	/** Common shader variations. */
-
 	/** Returns a specific vertex input shader variation. */
-	template<bool skinned, bool morph>
-	static const ShaderVariation& getVertexInputVariation()
+	template<bool SKINNED, bool MORPH, bool WRITE_VELOCITY>
+	static const ShaderVariation& getVertexInputVariation(bool supportsVelocityWrites)
 	{
-		static ShaderVariation variation = ShaderVariation(
+		if (!supportsVelocityWrites)
 		{
-			ShaderVariation::Param("SKINNED", skinned),
-			ShaderVariation::Param("MORPH", morph),
-		});
+			static ShaderVariation variation = ShaderVariation(
+				{
+					ShaderVariation::Param("SKINNED", SKINNED),
+					ShaderVariation::Param("MORPH", MORPH),
+				});
 
-		return variation;
-	}
-
-	/** Returns a specific forward rendering shader variation. */
-	template<bool skinned, bool morph, bool clustered>
-	static const ShaderVariation& getForwardRenderingVariation()
-	{
-		static ShaderVariation variation = ShaderVariation(
+			return variation;
+		}
+		else
 		{
-			ShaderVariation::Param("SKINNED", skinned),
-			ShaderVariation::Param("MORPH", morph),
-			ShaderVariation::Param("CLUSTERED", clustered),
-		});
+			static ShaderVariation variation = ShaderVariation(
+				{
+					ShaderVariation::Param("SKINNED", SKINNED),
+					ShaderVariation::Param("MORPH", MORPH),
+					ShaderVariation::Param("WRITE_VELOCITY", WRITE_VELOCITY),
+				});
 
-		return variation;
+			return variation;
+		}
 	}
-
-	/** Technique tags. */
-	static StringID RTag_Skinned = "Skinned";
-	static StringID RTag_Morph = "Morph";
-	static StringID RTag_SkinnedMorph = "SkinnedMorph";
 
 	/**	Set of options that can be used for controlling the renderer. */	
 	struct BS_CORE_EXPORT RendererOptions
 	{
 		virtual ~RendererOptions() = default;
+	};
+
+	/**
+	 * Contains information about the current state of a particular renderer view. This will be updated
+	 * during rendering of a single frame.
+	 */
+	struct RendererViewContext
+	{
+		/** Current target the view is rendering to. */
+		SPtr<RenderTarget> currentTarget;
 	};
 
 	/** Settings that control renderer scene capture. */

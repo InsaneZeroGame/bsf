@@ -679,7 +679,9 @@ namespace bs
 				output = ((exponent + 112) << 23) | (mantissa << 18);
 			}
 
-			return *(float*)&output;
+			float result;
+			std::memcpy(&result, &output, sizeof(float));
+			return result;
 		}
 
 		/** Converts a 11-bit float to a 32-bit float according to OpenGL packed_float extension. */
@@ -719,7 +721,9 @@ namespace bs
 				output = ((exponent + 112) << 23) | (mantissa << 17);
 			}
 
-			return *(float*)&output;
+			float result;
+			std::memcpy(&result, &output, sizeof(float));
+			return result;
 		}
 
 		/**
@@ -805,7 +809,7 @@ namespace bs
 			return encodeVarInt(temp, output);
 		}
 
-		/** @copydoc decodeVarInt(UINT32, UINT8*) */
+		/** @copydoc decodeVarInt(UINT32&, const UINT8*, UINT32) */
 		static UINT32 decodeVarInt(INT32& value, const UINT8* input, UINT32 size)
 		{
 			UINT32 temp;
@@ -954,7 +958,7 @@ namespace bs
 			return encodeVarInt(temp, output);
 		}
 
-		/** @copydoc decodeVarInt(UINT64, UINT8*) */
+		/** @copydoc decodeVarInt(UINT64&, const UINT8*, UINT32) */
 		static UINT32 decodeVarInt(INT64& value, const UINT8* input, UINT32 size)
 		{
 			UINT64 temp;

@@ -25,6 +25,7 @@ namespace bs
 			value.audio = "";
 			value.input = "";
 			value.physicsCooking = true;
+			value.asyncAnimation = true;
 			value.primaryWindowDesc = RenderWindowDesc.Default();
 			value.importers = null;
 
@@ -42,11 +43,18 @@ namespace bs
 		/// <summary>Name of the input plugin to use.</summary>
 		public string input;
 		/// <summary>
-		/// True if physics cooking library should be loaded. Cooking is useful for creating collision meshes during development
-		/// type, but might be unnecessary in the final application. When turned off you can save on space by not shipping the
+		/// True if physics cooking library should be loaded. Cooking is useful for creating collision meshes during development 
+		/// type, but might be unnecessary in the final application. When turned off you can save on space by not shipping the 
 		/// cooking library.
 		/// </summary>
 		public bool physicsCooking;
+		/// <summary>
+		/// True if animation should be evaluated at the same time while rendering is happening. This introduces a one frame 
+		/// delay to all animations but can result in better performance. If false the animation will be forced to finish 
+		/// evaluating before rendering starts, ensuring up-to-date frame but potentially blocking the rendering thread from 
+		/// moving forward until the animation finishes.
+		/// </summary>
+		public bool asyncAnimation;
 		/// <summary>Describes the window to create during start-up.</summary>
 		public RenderWindowDesc primaryWindowDesc;
 		/// <summary>A list of importer plugins to load.</summary>

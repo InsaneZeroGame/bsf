@@ -10,12 +10,13 @@
 #include "Math/BsMatrixNxM.h"
 #include "Math/BsVector3I.h"
 #include "Math/BsVector4I.h"
-#include "Serialization/BsMemorySerializer.h"
 #include "Material/BsMaterialParams.h"
 #include "Material/BsGpuParamsSet.h"
 #include "Animation/BsAnimationCurve.h"
 #include "CoreThread/BsCoreObjectSync.h"
 #include "Private/RTTI/BsShaderVariationRTTI.h"
+#include "Serialization/BsBinarySerializer.h"
+#include "FileSystem/BsDataStream.h"
 
 namespace bs
 {
@@ -200,7 +201,6 @@ namespace bs
 		}
 
 		return bestTechniqueIdx;
-		
 	}
 
 	template<bool Core>
@@ -678,36 +678,36 @@ namespace bs
 		UINT32 size = sizeof(bool) + sizeof(UINT32) * 2 + sizeof(SPtr<ct::Shader>) +
 			sizeof(SPtr<ct::Technique>) * numTechniques + paramsSize;
 
-		size += coreSyncGetElemSize(mVariation);
+		size += csync_size(mVariation);
 
 		UINT8* buffer = allocator->alloc(size);
-		char* dataPtr = (char*)buffer;
+		Bitstream stream(buffer, size);
 
-		dataPtr = rttiWriteElem(syncAllParams, dataPtr);
+		rtti_write(syncAllParams, stream);
 		
-		SPtr<ct::Shader>* shader = new (dataPtr)SPtr<ct::Shader>();
+		SPtr<ct::Shader>* shader = new (stream.cursor())SPtr<ct::Shader>();
 		if (mShader.isLoaded(false))
 			*shader = mShader->getCore();
 		else
 			*shader = nullptr;
 
-		dataPtr += sizeof(SPtr<ct::Shader>);
-		dataPtr = rttiWriteElem(numTechniques, dataPtr);
+		stream.skipBytes(sizeof(SPtr<ct::Shader>));
+		rtti_write(numTechniques, stream);
 
 		for(UINT32 i = 0; i < numTechniques; i++)
 		{
-			SPtr<ct::Technique>* technique = new (dataPtr) SPtr<ct::Technique>();
+			SPtr<ct::Technique>* technique = new (stream.cursor()) SPtr<ct::Technique>();
 			*technique = mTechniques[i]->getCore();
 
-			dataPtr += sizeof(SPtr<ct::Technique>);
+			stream.skipBytes(sizeof(SPtr<ct::Technique>));
 		}
 
-		dataPtr = rttiWriteElem(paramsSize, dataPtr);
+		rtti_write(paramsSize, stream);
 		if (mParams != nullptr)
-			mParams->getSyncData((UINT8*)dataPtr, paramsSize, syncAllParams);
+			mParams->getSyncData(stream.cursor(), paramsSize, syncAllParams);
 
-		dataPtr += paramsSize;
-		dataPtr = coreSyncWriteElem(mVariation, dataPtr);
+		stream.skipBytes(paramsSize);
+		csync_write(mVariation, stream);
 
 		return CoreSyncData(buffer, size);
 	}
@@ -790,13 +790,12 @@ namespace bs
 
 	HMaterial Material::clone()
 	{
-		UINT32 bufferSize = 0;
+		SPtr<MemoryDataStream> outputStream = bs_shared_ptr_new<MemoryDataStream>();
+		BinarySerializer serializer;
 
-		MemorySerializer serializer;
-		UINT8* buffer = serializer.encode(this, bufferSize, (void*(*)(size_t))&bs_alloc);
-
-		SPtr<Material> cloneObj = std::static_pointer_cast<Material>(serializer.decode(buffer, bufferSize));
-		bs_free(buffer);
+		serializer.encode(this, outputStream);
+		outputStream->seek(0);
+		SPtr<Material> cloneObj = std::static_pointer_cast<Material>(serializer.decode(outputStream, (UINT32)outputStream->size()));
 
 		return static_resource_cast<Material>(gResources()._createResourceHandle(cloneObj));
 	}
@@ -1055,45 +1054,45 @@ namespace bs
 	
 	void Material::syncToCore(const CoreSyncData& data)
 	{
-		char* dataPtr = (char*)data.getBuffer();
+		Bitstream stream(data.getBuffer(), data.getBufferSize());
 
 		bool syncAllParams;
-		dataPtr = rttiReadElem(syncAllParams, dataPtr);
+		rtti_read(syncAllParams, stream);
 
 		UINT64 initialParamVersion = mParams != nullptr ? mParams->getParamVersion() : 1;
 		if(syncAllParams)
 			mParams = nullptr;
 
-		SPtr<Shader>* shader = (SPtr<Shader>*)dataPtr;
+		SPtr<Shader>* shader = (SPtr<Shader>*)stream.cursor();
 
 		mShader = *shader;
 		shader->~SPtr<Shader>();
-		dataPtr += sizeof(SPtr<Shader>);
+		stream.skipBytes(sizeof(SPtr<Shader>));
 
 		UINT32 numTechniques;
-		dataPtr = rttiReadElem(numTechniques, dataPtr);
+		rtti_read(numTechniques, stream);
 
 		mTechniques.resize(numTechniques);
 		for(UINT32 i = 0; i < numTechniques; i++)
 		{
-			SPtr<Technique>* technique = (SPtr<Technique>*)dataPtr;
+			SPtr<Technique>* technique = (SPtr<Technique>*)stream.cursor();
 			mTechniques[i] = *technique;
 			technique->~SPtr<Technique>();
-			dataPtr += sizeof(SPtr<Technique>);
+			stream.skipBytes(sizeof(SPtr<Technique>));
 		}
 
 		UINT32 paramsSize = 0;
-		dataPtr = rttiReadElem(paramsSize, dataPtr);
+		rtti_read(paramsSize, stream);
 		if (mParams == nullptr && mShader != nullptr)
 			mParams = bs_shared_ptr_new<MaterialParams>(mShader, initialParamVersion);
 
 		if(mParams != nullptr && paramsSize > 0)
-			mParams->setSyncData((UINT8*)dataPtr, paramsSize);
+			mParams->setSyncData(stream.cursor(), paramsSize);
 
-		dataPtr += paramsSize;
+		stream.skipBytes(paramsSize);
 
 		mVariation.clearParams();
-		dataPtr = coreSyncReadElem(mVariation, dataPtr);
+		csync_read(mVariation, stream);
 	}
 
 	SPtr<Material> Material::create(const SPtr<Shader>& shader)

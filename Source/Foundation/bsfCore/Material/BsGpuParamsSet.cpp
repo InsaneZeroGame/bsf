@@ -915,7 +915,12 @@ namespace bs
 			if(materialParamInfo->dataType != GPDT_STRUCT)
 			{
 				const GpuParamDataTypeInfo& typeInfo = GpuParams::PARAM_SIZES.lookup[(int)materialParamInfo->dataType];
-				UINT32 paramSize = typeInfo.numColumns * typeInfo.numRows * typeInfo.baseTypeSize;
+
+				UINT32 paramSize;
+				if(materialParamInfo->dataType != GPDT_COLOR)
+					paramSize = typeInfo.numColumns * typeInfo.numRows * typeInfo.baseTypeSize;
+				else
+					paramSize = paramInfo.arrayStride * typeInfo.baseTypeSize;
 
 				UINT8* data = params->getData(materialParamInfo->index);
 				if (!isAnimated)
@@ -1073,10 +1078,10 @@ namespace bs
 							Color value;
 							if (params->isAnimated(*materialParamInfo, i))
 							{
-								const ColorGradient& gradient = params->getColorGradientParam(*materialParamInfo, i);
+								const ColorGradientHDR& gradient = params->getColorGradientParam(*materialParamInfo, i);
 
 								const float wrappedT = Math::repeat(t, gradient.getDuration());
-								value = Color::fromRGBA(gradient.evaluate(wrappedT));
+								value = gradient.evaluate(wrappedT);
 							}
 							else
 								memcpy(&value, data + readOffset, paramSize);

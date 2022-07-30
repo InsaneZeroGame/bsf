@@ -6,7 +6,7 @@
 #include "Reflection/BsIReflectable.h"
 #include "Math/BsVector3.h"
 #include "Image/BsColor.h"
-#include <cfloat>
+#include "Image/BsTexture.h"
 
 namespace bs
 {
@@ -247,7 +247,7 @@ namespace bs
 		BS_SCRIPT_EXPORT()
 		AmbientOcclusionSettings() = default;
 
-		/** Enables or disabled the screen space ambient occlusion effect. */
+		/** Enables or disables the screen space ambient occlusion effect. */
 		BS_SCRIPT_EXPORT()
 		bool enabled = true;
 
@@ -317,39 +317,62 @@ namespace bs
 		RTTITypeBase* getRTTI() const override;
 	};
 
-	/** Settings that control the depth-of-field effect. */
-	struct BS_CORE_EXPORT BS_SCRIPT_EXPORT() DepthOfFieldSettings : public IReflectable
+	/** Types of available depth of field effects. */
+	enum class BS_SCRIPT_EXPORT(m:Rendering) DepthOfFieldType
 	{
-		BS_SCRIPT_EXPORT()
-		DepthOfFieldSettings() = default;
+		/** 
+		 * Fastest depth of field variant, uses gaussian blur to approximate depth of field on near and far objects, but
+		 * doesn't use any physically based methods for determining blur amount.
+		 */
+		Gaussian,
+		/**
+		 * Very expensive depth of field variant that allows you to use a bokeh texture, controlling the shape of the blur
+		 * (usually intended to mimic real world camera aperature shapes). Blur is varied according to actual object
+		 * distance and the effect is more physically based than gaussian blur (but not completely). Very expensive in
+		 * terms of performance.
+		 */
+		Bokeh
+	};
+
+	/** Base class for both sim and core thread variants of DepthOfFieldSettings. */
+	struct BS_CORE_EXPORT DepthOfFieldSettingsBase
+	{
+		DepthOfFieldSettingsBase() = default;
 
 		/** Enables or disables the depth of field effect. */
 		BS_SCRIPT_EXPORT()
 		bool enabled = false;
 
-		/**
+		/** Type of depth of field effect to use. */
+		BS_SCRIPT_EXPORT()
+		DepthOfFieldType type = DepthOfFieldType::Gaussian;
+
+		/** 
 		 * Distance from the camera at which the focal plane is located in. Objects at this distance will be fully in focus.
+		 * In world units (meters).
 		 */
 		BS_SCRIPT_EXPORT()
 		float focalDistance = 0.75f;
 		
-		/**
+		/** 
 		 * Range within which the objects remain fully in focus. This range is applied relative to the focal distance.
-		 * Only relevant if Gaussian depth of field is used as other methods don't use a constant in-focus range.
+		 * This parameter should usually be non-zero when using the Gaussian depth of field effect. When using other types
+		 * of depth-of-field you can set this to zero for a more physically-based effect, or keep it non-zero for more
+		 * artistic control. In world units (meters).
 		 */
 		BS_SCRIPT_EXPORT()
 		float focalRange = 0.75f;
 
 		/**
-		 * Determines the size of the range within which objects transition from focused to fully unfocused, at the near
-		 * plane. Only relevant for Gaussian depth of field.
+		 * Determines the size of the range within which objects transition from focused to fully unfocused, at the near 
+		 * plane. Only relevant for Gaussian and Bokeh depth of field. In world units (meters).
 		 */
 		BS_SCRIPT_EXPORT()
 		float nearTransitionRange = 0.25f;
 
 		/**
-		 * Determines the size of the range within which objects transition from focused to fully unfocused, at the far
-		 * plane. Only relevant for Gaussian depth of field.
+		 * Determines the size of the range within which objects transition from focused to fully unfocused, at the far 
+		 * plane. Only relevant for Gaussian and Bokeh depth of field. In world units (meters).
 		 */
 		BS_SCRIPT_EXPORT()
 		float farTransitionRange = 0.25f;
@@ -368,6 +391,194 @@ namespace bs
 		BS_SCRIPT_EXPORT()
 		float farBlurAmount = 0.02f;
 
+		/** 
+		 * Determines the maximum size of the blur kernel, in percent of view size. Larger values cost more performance. 
+		 * Only relevant when using Bokeh depth of field.
+		 */
+		BS_SCRIPT_EXPORT(range:[0,1])
+		float maxBokehSize = 0.025f;
+
+		/** 
+		 * Determines the maximum color difference between surrounding pixels allowed (as a sum of all channels) before
+		 * higher fidelity sampling is triggered. Increasing this value can improve performance as less higher fidelity
+		 * samples will be required, but may decrease quality of the effect. Only relevant when using Bokeh depth of
+		 * field.
+		 */
+		BS_SCRIPT_EXPORT(range:[0,10.0])
+		float adaptiveColorThreshold = 1.0f;
+
+		/** 
+		 * Determines the minimum circle of confusion size before higher fidelity sampling is triggered. Small values
+		 * trigger high fidelity sampling because they can otherwise produce aliasing, and they are small enough so they
+		 * don't cost much. Increasing this value can improve performance as less higher fidelity samples will be required, 
+		 * but may decrease quality of the effect. Only relevant when using Bokeh depth of field.
+		 */
+		BS_SCRIPT_EXPORT(range:[0,1.0])
+		float adaptiveRadiusThreshold = 0.1f;
+
+		/** Camera aperture size in mm. Only relevant when using Bokeh depth of field. */
+		BS_SCRIPT_EXPORT(range:[1,200])
+		float apertureSize = 50.0f;
+
+		/** Focal length of the camera's lens (e.g. 75mm). Only relevant when using Bokeh depth of field. */
+		BS_SCRIPT_EXPORT(range:[1,500])
+		float focalLength = 50.0f;
+
+		/** 
+		 * Camera sensor width and height, in mm. Used for controlling the size of the circle of confusion. Only relevant 
+		 * when using Bokeh depth of field. 
+		 */
+		BS_SCRIPT_EXPORT()
+		Vector2 sensorSize = Vector2(22.2f, 14.8f);
+
+		/**
+		 * Set to true if Bokeh flare should use soft depth testing to ensure they don't render on top of foreground
+		 * geometry. This can help reduce background bleeding into the foreground, which can be especially noticeable
+		 * if the background is much brighter than the foreground. Use @p occlusionDepthRange to tweak the effect.
+		 *
+		 */
+		BS_SCRIPT_EXPORT()
+		bool bokehOcclusion = true;
+
+		/**
+		 * Range in world units over which range to fade out Bokeh flare influence. Influence of the flare will be
+		 * faded out as the depth difference between the flare's origin pixel and the destination pixel grows larger.
+		 * Only relevant if @p bokehOcclusion is turned on.
+		 */
+		BS_SCRIPT_EXPORT()
+		float occlusionDepthRange = 1.0f;
+		
+	protected:
+		~DepthOfFieldSettingsBase() = default;
+	};
+
+	/** Template version of DepthOfFieldSettings that can be specialized for either core or simulation thread. */
+	template<bool Core>
+	struct BS_CORE_EXPORT TDepthOfFieldSettings : DepthOfFieldSettingsBase
+	{
+		using TextureType = CoreVariantHandleType<Texture, Core>;
+
+		/** Texture to use for the bokeh shape. Only relevant when using Bokeh depth of field. */
+		BS_SCRIPT_EXPORT()
+		TextureType bokehShape;
+
+		/************************************************************************/
+		/* 								RTTI		                     		*/
+		/************************************************************************/
+
+		/** Enumerates all the fields in the type and executes the specified processor action for each field. */
+		template<class P>
+		void rttiEnumFields(P processor);
+
+	protected:
+		~TDepthOfFieldSettings() = default;
+	};
+
+	/** Settings that control the depth-of-field effect. */
+	struct BS_CORE_EXPORT BS_SCRIPT_EXPORT() DepthOfFieldSettings : TDepthOfFieldSettings<false>, IReflectable
+	{
+		BS_SCRIPT_EXPORT()
+		DepthOfFieldSettings() = default;
+
+		/************************************************************************/
+		/* 								RTTI		                     		*/
+		/************************************************************************/
+	public:
+		friend class DepthOfFieldSettingsRTTI;
+		static RTTITypeBase* getRTTIStatic();
+		RTTITypeBase* getRTTI() const override;
+	};
+
+	namespace ct
+	{
+		/** Core thread variant of DepthOfFieldSettings. */
+		struct BS_CORE_EXPORT BS_SCRIPT_EXPORT() DepthOfFieldSettings : TDepthOfFieldSettings<true>
+		{
+			DepthOfFieldSettings() = default;
+		};
+	}
+
+	/** Determines which parts of the scene will trigger motion blur. */
+	enum class BS_SCRIPT_EXPORT(m:Rendering) MotionBlurDomain
+	{
+		/** Camera movement and rotation will result in full-screen motion blur. */
+		CameraOnly,
+
+		/**
+		 * Object movement and rotation will result in blurring of the moving object. Can be significantly more
+		 * expensive than just using camera blur due to the requirement to use a velocity buffer (unless some
+		 * other effect also requires it, in which case it will be re-used).
+		 */
+		ObjectOnly,
+
+		/** Both the camera movement and object movement will result in motion blur. */
+		CameraAndObject
+	};
+
+	/** Type of filter to use when filtering samples contributing to a blurred pixel. */
+	enum class BS_SCRIPT_EXPORT(m:Rendering) MotionBlurFilter
+	{
+		/** Samples will be simply averaged together to create the blurred pixel. */
+		Simple,
+
+		/**
+		 * A more advanced reconstruction filter will be used. This filter provides better blur quality at a
+		 * performance cost. In particular the filter will improve blurring at object boundaries, allowing blur
+		 * to extend beyond the object silhouette. It will also try to estimate blurred background and provide
+		 * better weighting between background, center and foreground samples.
+		 */
+		Reconstruction
+	};
+
+	/** Determines the number of samples to take during motion blur filtering. */
+	enum class BS_SCRIPT_EXPORT() MotionBlurQuality
+	{
+		/** 4 samples per pixel. */
+		VeryLow,
+		/** 6 samples per pixel. */
+		Low,
+		/** 8 samples per pixel. */
+		Medium,
+		/** 12 samples per pixel. */
+		High,
+		/** 16 samples per pixel. */
+		Ultra
+	};
+
+	/** Settings that control the motion blur effect. */
+	struct BS_CORE_EXPORT BS_SCRIPT_EXPORT(m:Rendering) MotionBlurSettings : public IReflectable
+	{
+		BS_SCRIPT_EXPORT()
+		MotionBlurSettings() = default;
+
+		/** Enables or disables the motion blur effect. */
+		BS_SCRIPT_EXPORT()
+		bool enabled = false;
+
+		/** Determines which parts of the scene will trigger motion blur. */
+		BS_SCRIPT_EXPORT()
+		MotionBlurDomain domain = MotionBlurDomain::CameraAndObject;
+
+		/** Type of filter to use when filtering samples contributing to a blurred pixel. */
+		BS_SCRIPT_EXPORT()
+		MotionBlurFilter filter = MotionBlurFilter::Reconstruction;
+
+		/**
+		 * Determines the number of samples to take during motion blur filtering. Increasing this value will
+		 * yield higher quality blur at the cost of the performance.
+		 */
+		BS_SCRIPT_EXPORT()
+		MotionBlurQuality quality = MotionBlurQuality::Medium;
+
+		/**
+		 * Determines the maximum radius over which the blur samples are allowed to be taken, in percent of the
+		 * screen width (e.g. with 1% radius, on 1920x1028 resolution the maximum radius in pixels will be
+		 * 1920 * 0.01 = 20px). This clamps the maximum velocity that can affect the blur, as higher velocities
+		 * require higher radius. Very high values can adversely affect performance as cache accesses become more random. 
+		 */
+		BS_SCRIPT_EXPORT()
+		float maximumRadius = 0.01f; // TODO - Set this in pixels, but always up/downsample to a specific resolution? Would improve cache performance.
+
 		/************************************************************************/
 		/* 								RTTI		                     		*/
 		/************************************************************************/
@@ -376,7 +587,42 @@ namespace bs
 		template<class P>
 		void rttiEnumFields(P processor);
 	public:
-		friend class DepthOfFieldSettingsRTTI;
+		friend class MotionBlurSettingsRTTI;
+		static RTTITypeBase* getRTTIStatic();
+		RTTITypeBase* getRTTI() const override;
+	};
+
+	/** Settings that control temporal anti-aliasing. */
+	struct BS_CORE_EXPORT BS_SCRIPT_EXPORT(m :Rendering) TemporalAASettings : public IReflectable
+	{
+		BS_SCRIPT_EXPORT()
+		TemporalAASettings() = default;
+
+		/** Enables or disables temporal anti-aliasing. */
+		BS_SCRIPT_EXPORT()
+		bool enabled = false;
+
+		/**
+		 * Number of different jittered positions to use. Each frame will use one position and subsequent frames
+		 * will use subsequent positions until this number of reached, at which point the positions start getting
+		 * re-used from the start.
+		 */
+		BS_SCRIPT_EXPORT(range:[4,128])
+		UINT32 jitteredPositionCount = 8;
+
+		/** Determines the distance between temporal AA samples. Larger values result in a sharper image. */
+		BS_SCRIPT_EXPORT(range:[0, 1] )
+		float sharpness = 1.0f;
+
+		/************************************************************************/
+		/* 								RTTI		                     		*/
+		/************************************************************************/
+
+		/** Enumerates all the fields in the type and executes the specified processor action for each field. */
+		template<class P>
+		void rttiEnumFields(P processor);
+	public:
+		friend class TemporalAASettingsRTTI;
 		static RTTITypeBase* getRTTIStatic();
 		RTTITypeBase* getRTTI() const override;
 	};
@@ -597,6 +843,124 @@ namespace bs
 		RTTITypeBase* getRTTI() const override;
 	};
 
+	/** Types of available chromatic aberration effects. */
+	enum class BS_SCRIPT_EXPORT(m:Rendering) ChromaticAberrationType
+	{
+		/** Simple chromatic aberration effect that is fast to execute. */
+		Simple,
+
+		/**
+		 * More complex chromatic aberration effect that takes longer to execute but may yield
+		 * more visually pleasing results than the simple variant.
+		 */
+		Complex
+	};
+
+	/** Base class used for both sim and core thread variants of ChromaticAberrationSettings. */
+	struct BS_CORE_EXPORT ChromaticAberrationSettingsBase
+	{
+		ChromaticAberrationSettingsBase() = default;
+
+		/** Enables or disables the effect. */
+		BS_SCRIPT_EXPORT()
+		bool enabled = false;
+
+		/** Type of algorithm to use for rendering the effect. */
+		BS_SCRIPT_EXPORT()
+		ChromaticAberrationType type = ChromaticAberrationType::Simple;
+
+		/**
+		 * Determines the brightness of the lens flare effect. Value of 1 means the lens flare will be displayed at the
+		 * same intensity as the scene it was derived from. In range [0, 1], default being 0.05.
+		 */
+		BS_SCRIPT_EXPORT(range:[0,1])
+		float shiftAmount = 0.05f;
+
+	protected:
+		~ChromaticAberrationSettingsBase() = default;
+	};
+
+	/** Template version of ChromaticAberrationSettings that can be specialized for either core or simulation thread. */
+	template<bool Core>
+	struct BS_CORE_EXPORT TChromaticAberrationSettings : ChromaticAberrationSettingsBase 
+	{
+		using TextureType = CoreVariantHandleType<Texture, Core>;
+
+		/**
+		 * Optional texture to apply to generate the channel shift fringe, allowing you to modulate the shifted colors.
+		 * This texture should be 3x1 size, where the first pixel modules red, second green and third blue channel.
+		 * If using the complex aberration effect you can use a larger texture, Nx1 size.
+		 */
+		BS_SCRIPT_EXPORT()
+		TextureType fringeTexture;
+
+		/************************************************************************/
+		/* 								RTTI		                     		*/
+		/************************************************************************/
+
+		/** Enumerates all the fields in the type and executes the specified processor action for each field. */
+		template<class P>
+		void rttiEnumFields(P processor);
+
+	protected:
+		~TChromaticAberrationSettings() = default;
+	};
+
+	/** Settings that control the chromatic aberration effect. */
+	struct BS_CORE_EXPORT BS_SCRIPT_EXPORT() ChromaticAberrationSettings : TChromaticAberrationSettings<false>, IReflectable
+	{
+		BS_SCRIPT_EXPORT()
+		ChromaticAberrationSettings() = default;
+
+		/************************************************************************/
+		/* 								RTTI		                     		*/
+		/************************************************************************/
+	public:
+		friend class ChromaticAberrationSettingsRTTI;
+		static RTTITypeBase* getRTTIStatic();
+		RTTITypeBase* getRTTI() const override;
+	};
+
+	namespace ct
+	{
+		/** Core thread variant of ChromaticAberrationSettings. */
+		struct BS_CORE_EXPORT ChromaticAberrationSettings : TChromaticAberrationSettings<true>
+		{
+			ChromaticAberrationSettings() = default;
+		};
+	}
+
+	/** Settings that control the film grain effect. Film grains adds a time-varying noise effect over the entire image. */
+	struct BS_CORE_EXPORT BS_SCRIPT_EXPORT(m:Rendering) FilmGrainSettings : public IReflectable
+	{
+		BS_SCRIPT_EXPORT()
+		FilmGrainSettings() = default;
+
+		/** Enables or disables the effect. */
+		BS_SCRIPT_EXPORT()
+		bool enabled = false;
+
+		/** Controls how intense are the displayed film grains. */
+		BS_SCRIPT_EXPORT(range:[0,100.0])
+		float intensity = 16.0f;
+
+		/** Controls at what speed do the film grains change. */
+		BS_SCRIPT_EXPORT(range:[0,100.0])
+		float speed = 10.0f;
+
+		/************************************************************************/
+		/* 								RTTI		                     		*/
+		/************************************************************************/
+
+		/** Enumerates all the fields in the type and executes the specified processor action for each field. */
+		template<class P>
+		void rttiEnumFields(P processor);
+	public:
+		friend class FilmGrainSettingsRTTI;
+		static RTTITypeBase* getRTTIStatic();
+		RTTITypeBase* getRTTI() const override;
+	};
+
 	/** Various options that control shadow rendering for a specific view. */
 	struct BS_CORE_EXPORT BS_SCRIPT_EXPORT(m:Rendering) ShadowSettings : public IReflectable
 	{
@@ -648,13 +1012,11 @@ namespace bs
 		static RTTITypeBase* getRTTIStatic();
 		RTTITypeBase* getRTTI() const override;
 	};
-	
-	/** Settings that control rendering for a specific camera (view). */
-	struct BS_CORE_EXPORT BS_SCRIPT_EXPORT(m:Rendering) RenderSettings : public IReflectable
+
+	/** Base class for both sim and core thread variants of RenderSettings. */
+	struct BS_CORE_EXPORT RenderSettingsBase
 	{
-		BS_SCRIPT_EXPORT()
-		RenderSettings() = default;
-		virtual ~RenderSettings() = default;
+		RenderSettingsBase() = default;
 
 		/**
 		 * Determines should automatic exposure be applied to the HDR image. When turned on the average scene brightness
@@ -707,10 +1069,6 @@ namespace bs
 		BS_SCRIPT_EXPORT()
 		ColorGradingSettings colorGrading;
 
-		/** Parameters used for customizing the depth of field effect. */
-		BS_SCRIPT_EXPORT()
-		DepthOfFieldSettings depthOfField;
-
 		/** Parameters used for customizing screen space ambient occlusion. */
 		BS_SCRIPT_EXPORT()
 		AmbientOcclusionSettings ambientOcclusion;
@@ -726,6 +1084,18 @@ namespace bs
 		/** Parameters used for customizing the screen space lens flare effect. */
 		BS_SCRIPT_EXPORT()
 		ScreenSpaceLensFlareSettings screenSpaceLensFlare;
+
+		/** Parameters used for customizing the film grain effect. */
+		BS_SCRIPT_EXPORT()
+		FilmGrainSettings filmGrain;
+
+		/** Parameters used for customizing the motion blur effect. */
+		BS_SCRIPT_EXPORT()
+		MotionBlurSettings motionBlur;
+
+		/** Parameters used for customizing the temporal anti-aliasing effect. */
+		BS_SCRIPT_EXPORT()
+		TemporalAASettings temporalAA;
 
 		/** Enables the fast approximate anti-aliasing effect. */
 		BS_SCRIPT_EXPORT()
@@ -766,6 +1136,14 @@ namespace bs
 		BS_SCRIPT_EXPORT()
 		bool enableShadows = true;
 
+		/**
+		 * Determines if the G-Buffer should contain per-pixel velocity information. This can be useful if you are rendering
+		 * an effect that requires this information. Note that effects such as motion blur or temporal anti-aliasing
+		 * might force the velocity buffer to be enabled regardless of this setting.
+		 */
+		BS_SCRIPT_EXPORT()
+		bool enableVelocityBuffer = false;
+
 		/** Parameters used for customizing shadow rendering. */
 		BS_SCRIPT_EXPORT()
 		ShadowSettings shadowSettings;
@@ -796,6 +1174,22 @@ namespace bs
 		BS_SCRIPT_EXPORT()
 		float cullDistance = FLT_MAX;
 
+	protected:
+		~RenderSettingsBase() = default;
+	};
+
+	/** Template version of RenderSettings that can be specialized for either core or simulation thread. */
+	template<bool Core>
+	struct BS_CORE_EXPORT TRenderSettings : RenderSettingsBase
+	{
+		/** Parameters used for customizing the gaussian depth of field effect. */
+		BS_SCRIPT_EXPORT()
+		CoreVariantType<DepthOfFieldSettings, Core> depthOfField;
+
+		/** Parameters used for customizing the chromatic aberration effect. */
+		BS_SCRIPT_EXPORT()
+		CoreVariantType<ChromaticAberrationSettings, Core> chromaticAberration;
+
 		/************************************************************************/
 		/* 								RTTI		                     		*/
 		/************************************************************************/
@@ -804,11 +1198,36 @@ namespace bs
 		template<class P>
 		void rttiEnumFields(P processor);
 
+	protected:
+		~TRenderSettings() = default;
+	};
+	
+	/** Settings that control rendering for a specific camera (view). */
+	struct BS_CORE_EXPORT BS_SCRIPT_EXPORT(m:Rendering) RenderSettings : TRenderSettings<false>, IReflectable
+	{
+		BS_SCRIPT_EXPORT()
+		RenderSettings() = default;
+		virtual ~RenderSettings() = default;
+
+		/************************************************************************/
+		/* 								RTTI		                     		*/
+		/************************************************************************/
+
 	public:
 		friend class RenderSettingsRTTI;
 		static RTTITypeBase* getRTTIStatic();
 		RTTITypeBase* getRTTI() const override;
 	};
+
+	namespace ct
+	{
+		/** Core thread variant of RenderSettings. */
+		struct BS_CORE_EXPORT BS_SCRIPT_EXPORT(m :Rendering) RenderSettings : TRenderSettings<true>
+		{
+			RenderSettings() = default;
+			virtual ~RenderSettings() = default;
+		};
+	}
 
 	/** @} */
 }

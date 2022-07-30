@@ -6,7 +6,7 @@ set (BS_FRAMEWORK_CURRENT_RELEASE_YEAR 2019)
 
 set (BS_FRAMEWORK_PREBUILT_DEPENDENCIES_VERSION 11)
 set (BS_FRAMEWORK_SRC_DEPENDENCIES_VERSION 1)
-set (BS_FRAMEWORK_BUILTIN_ASSETS_VERSION 6)
+set (BS_FRAMEWORK_BUILTIN_ASSETS_VERSION 7)
 
 # Options
 set(AUDIO_MODULE "OpenAudio" CACHE STRING "Audio backend to use.")
@@ -242,7 +242,7 @@ endif()
 add_executable(bsfImportTool
 	Foundation/bsfEngine/Resources/BsBuiltinResourcesImporter.cpp)
 add_common_flags(bsfImportTool)
-target_compile_definitions(bsfImportTool PRIVATE -DBS_IS_ASSET_TOOL)
+target_compile_definitions(bsfImportTool PUBLIC -DBS_IS_ASSET_TOOL)
 
 target_link_libraries(bsfImportTool bsf)
 	

@@ -48,6 +48,8 @@ namespace bs
 
 		virtual bool isReadable() const { return (mAccess & READ) != 0; }
 		virtual bool isWriteable() const { return (mAccess & WRITE) != 0; }
+
+		/** Checks whether the stream reads/writes from a file system. */
 		virtual bool isFile() const = 0;
 
 		/** Reads data from the buffer and copies it to the specified value. */
@@ -63,7 +65,7 @@ namespace bs
 		 * 			
 		 * @note	Stream must be created with READ access mode.
 		 */
-		virtual size_t read(void* buf, size_t count) = 0;
+		virtual size_t read(void* buf, size_t count) const = 0;
 
 		/**
 		 * Write the requisite number of bytes to the stream and advance the write pointer.
@@ -75,6 +77,30 @@ namespace bs
 		 * @note	Stream must be created with WRITE access mode.
 		 */
 		virtual size_t write(const void* buf, size_t count) { return 0; }
+
+		/**
+		 * Reads bits from the stream into the provided buffer from the current cursor location and advances the cursor.
+		 * If the stream doesn't support per-bit reads, data size will be rounded up to nearest byte.
+		 *
+		 * @param[out]	data	Buffer to read the data from. Must have enough capacity to store @p count bits.
+		 * @param[in]	count	Number of bits to read.
+		 * @return				Number of bits actually read.
+		 *
+		 * @note	Stream must be created with READ access mode.
+		 */
+		virtual size_t readBits(uint8_t* data, uint32_t count);
+
+		/**
+		 * Writes bits from the provided buffer into the stream at the current cursor location and advances the cursor.
+		 * If the stream doesn't support per-bit writes, data size will be rounded up to nearest byte.
+		 *
+		 * @param[in]	data	Buffer to write the data from. Must have enough capacity to store @p count bits.
+		 * @param[in]	count	Number of bits to write.
+		 * @return				Number of bits actually written.
+		 *
+		 * @note	Stream must be created with WRITE access mode.
+		 */
+		virtual size_t writeBits(const uint8_t* data, uint32_t count);
 
 		/**
 		 * Writes the provided narrow string to the steam. String is convered to the required encoding before being written.
@@ -125,6 +151,13 @@ namespace bs
 		/** Returns the current byte offset from beginning. */
 		virtual size_t tell() const = 0;
 
+		/**
+		 * Aligns the read/write cursor to a byte boundary. @p count determines the alignment in bytes. Note the
+		 * requested alignment might not be achieved if count > 1 and it would move the cursor past the capacity of the
+		 * buffer, as the cursor will be clamped to buffer end regardless of alignment.
+		 */
+		virtual void align(uint32_t count = 1);
+
 		/** Returns true if the stream has reached the end. */
 		virtual bool eof() const = 0;
 
@@ -156,49 +189,57 @@ namespace bs
 	{		
 	public:
 		/**
-		 * Allocates a new chunk of memory and wraps it in a stream.
-		 *
-		 * @param[in]	size		Size of the memory chunk in bytes.
+		 * Initializes an empty memory stream. As data is written the stream will grow its internal memory storage
+		 * automatically.
 		 */
-		MemoryDataStream(size_t size);
+		MemoryDataStream();
+		
+		/**
+		 * Initializes a stream with some initial capacity. If more bytes than capacity is written, the stream will
+		 * grow its internal memory storage.
+		 *
+		 * @param[in]	capacity	Number of bytes to initially allocate for the internal memory storage.
+		 */
+		MemoryDataStream(size_t capacity);
 
 		/**
 		 * Wrap an existing memory chunk in a stream.
 		 *
 		 * @param[in] 	memory		Memory to wrap the data stream around.
 		 * @param[in]	size		Size of the memory chunk in bytes.
-		 * @param[in]	freeOnClose	Should the memory buffer be freed when the data stream goes out of scope.
 		 */
-		MemoryDataStream(void* memory, size_t size, bool freeOnClose = true);
+		MemoryDataStream(void* memory, size_t size);
 
 		/**
 		 * Create a stream which pre-buffers the contents of another stream. Data from the other buffer will be entirely
 		 * read and stored in an internal buffer.
-		 *
-		 * @param[in]	sourceStream		Stream to read data from.
 		 */
-		MemoryDataStream(DataStream& sourceStream);
+		MemoryDataStream(const MemoryDataStream& other);
 		
 		/**
 		 * Create a stream which pre-buffers the contents of another stream. Data from the other buffer will be entirely
 		 * read and stored in an internal buffer.
-		 *
-		 * @param[in]	sourceStream		Stream to read data from.
 		 */
-		MemoryDataStream(const SPtr<DataStream>& sourceStream);
+		MemoryDataStream(const SPtr<DataStream>& other);
 
+		/** Inherits the data from the provided stream, invalidating the source stream. */
+		MemoryDataStream(MemoryDataStream&& other);
 		~MemoryDataStream();
 
+		MemoryDataStream& operator= (const MemoryDataStream& other);
+		MemoryDataStream& operator= (MemoryDataStream&& other);
+
+		/** @copydoc DataStream::isFile */
 		bool isFile() const override { return false; }
 
 		/** Get a pointer to the start of the memory block this stream holds. */
-		UINT8* getPtr() const { return mData; }
+		uint8_t* data() const { return mData; }
 		
 		/** Get a pointer to the current position in the memory block this stream holds. */
-		UINT8* getCurrentPtr() const { return mPos; }
+		uint8_t* cursor() const { return mCursor; }
 		
 		/** @copydoc DataStream::read */
-		size_t read(void* buf, size_t count) override;
+		size_t read(void* buf, size_t count) const override;
 
 		/** @copydoc DataStream::write */
 		size_t write(const void* buf, size_t count) override;
@@ -221,12 +262,21 @@ namespace bs
 		/** @copydoc DataStream::close */
 		void close() override;
 
-	protected:
-		UINT8* mData;
-		UINT8* mPos;
-		UINT8* mEnd;
+		/**
+		 * Disowns the internal memory buffer, ensuring it wont be released when the stream goes out of scope.
+		 * The caller becomes responsible for freeing the internal data buffer.
+		 */
+		uint8_t* disownMemory() { mOwnsMemory = false; return mData;  }
 
-		bool mFreeOnClose;
+	protected:
+		/** Reallocates the internal buffer making enough room for @p numBytes. */
+		void realloc(size_t numBytes);
+		
+		uint8_t* mData = nullptr;
+		mutable uint8_t* mCursor = nullptr;
+		uint8_t* mEnd = nullptr;
+
+		bool mOwnsMemory = true;
 	};
 
 	/** Data stream for handling data from standard streams. */
@@ -248,7 +298,7 @@ namespace bs
 		bool isFile() const override { return true; }
 
 		/** @copydoc DataStream::read */
-		size_t read(void* buf, size_t count) override;
+		size_t read(void* buf, size_t count) const override;
 
 		/** @copydoc DataStream::write */
 		size_t write(const void* buf, size_t count) override;

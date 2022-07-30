@@ -18,6 +18,25 @@
 
 namespace bs
 {
+	/** @addtogroup Renderer
+	 *  @{
+	 */
+
+	/** Flags for controlling Camera options. */
+	enum class BS_SCRIPT_EXPORT(m:Rendering) CameraFlag
+	{
+		/**
+		 * If set the camera will only render when requested by the user through Camera::notifyNeedsRedraw().
+		 * Otherwise the camera will render every frame (unless disabled).
+		 */
+		OnDemand = 1 << 0,
+	};
+
+	using CameraFlags = Flags<CameraFlag>;
+	BS_FLAGS_OPERATORS(CameraFlag)
+
+	/** @} */
+
 	/** @addtogroup Renderer-Internal
 	 *  @{
 	 */
@@ -27,6 +46,7 @@ namespace bs
 	{
 		// First few bits reserved by ActorDirtyFlag
 		RenderSettings = 1 << 4,
+		Redraw = 1 << 5,
 		Viewport = 1 << 31
 	};
 
@@ -44,6 +64,12 @@ namespace bs
 		/** @copydoc SceneActor::setTransform */
 		void setTransform(const Transform& transform) override;
 
+		/** Determines flags used for controlling the camera behaviour. */
+		void setFlags(CameraFlags flag);
+
+		/** @copydoc setFlags() */
+		CameraFlags getFlags() const { return mCameraFlags; }
+
 		/**
 		 * Determines the camera horizontal field of view. This determines how wide the camera viewing angle is along the
 		 * horizontal axis. Vertical FOV is calculated from the horizontal FOV and the aspect ratio.
@@ -51,7 +77,7 @@ namespace bs
 		virtual void setHorzFOV(const Radian& fovy);
 
 		/** @copydoc setHorzFOV() */
-		virtual const Radian& getHorzFOV() const;
+		virtual const Radian& getHorzFOV() const { return mHorzFOV; }
 
 		/**
 		 * Determines the distance from the frustum to the near clipping plane. Anything closer than the near clipping plane will
@@ -60,7 +86,7 @@ namespace bs
 		virtual void setNearClipDistance(float nearDist);
 
 		/** @copydoc setNearClipDistance() */
-		virtual float getNearClipDistance() const;
+		virtual float getNearClipDistance() const { return mNearDist; }
 
 		/**
 		 * Determines the distance from the frustum to the far clipping plane. Anything farther than the far clipping plane will
@@ -69,7 +95,7 @@ namespace bs
 		virtual void setFarClipDistance(float farDist);
 
 		/** @copydoc setFarClipDistance() */
-		virtual float getFarClipDistance() const;
+		virtual float getFarClipDistance() const { return mFarDist; }
 
 		/**	Determines the current viewport aspect ratio (width / height). */
 		virtual void setAspectRatio(float ratio);
@@ -218,15 +244,11 @@ namespace bs
 		UINT32 getMSAACount() const { return mMSAA; }
 
 		/**
-		 * Settings that control rendering for this view. They determine how will the renderer process this view, which
-		 * effects will be enabled, and what properties will those effects use.
+		 * Notifies a on-demand camera that it should re-draw its contents on the next frame. Ignored for a camera
+		 * that isn't on-demand.
 		 */
-		void setRenderSettings(const SPtr<RenderSettings>& settings)
-			{ mRenderSettings = settings; _markCoreDirty((ActorDirtyFlag)CameraDirtyFlag::RenderSettings); }
-
-		/** @copydoc setRenderSettings() */
-		const SPtr<RenderSettings>& getRenderSettings() const { return mRenderSettings; }
-
+		void notifyNeedsRedraw() { _markCoreDirty((ActorDirtyFlag)CameraDirtyFlag::Redraw); }
+		
 		/**
 		 * Converts a point in world space to screen coordinates.
 		 *
@@ -413,12 +435,11 @@ namespace bs
 		float mOrthoHeight = 5; /**< Height in world units used for orthographic cameras. */
 		INT32 mPriority = 0; /**< Determines in what order will the camera be rendered. Higher priority means the camera will be rendered sooner. */
 		bool mMain = false; /**< Determines does this camera render to the main render surface. */
+		CameraFlags mCameraFlags; /**< Flags for controlling various behaviour. */
 
 		bool mCustomViewMatrix = false; /**< Is custom view matrix set. */
 		bool mCustomProjMatrix = false; /**< Is custom projection matrix set. */
 		UINT8 mMSAA = 1; /**< Number of samples to render the scene with. */
-
-		SPtr<RenderSettings> mRenderSettings; /**< Settings used to control rendering for this camera. */
 
 		bool mFrustumExtentsManuallySet = false; /**< Are frustum extents manually set. */
 
@@ -439,15 +460,27 @@ namespace bs
 
 	/** Templated common base class for both sim and core thread implementations of Camera. */
 	template<bool Core>
-	class TCamera : public CameraBase
+	class BS_CORE_EXPORT TCamera : public CameraBase
 	{
 		using ViewportType = CoreVariantType<Viewport, Core>;
+		using RenderSettingsType = CoreVariantType<RenderSettings, Core>;
 
 	public:
+		TCamera();
 		virtual ~TCamera() = default;
 
 		/**	Returns the viewport used by the camera. */	
 		SPtr<ViewportType> getViewport() const { return mViewport; }
+
+		/**
+		 * Settings that control rendering for this view. They determine how will the renderer process this view, which
+		 * effects will be enabled, and what properties will those effects use.
+		 */
+		void setRenderSettings(const SPtr<RenderSettingsType>& settings)
+			{ mRenderSettings = settings; _markCoreDirty((ActorDirtyFlag)CameraDirtyFlag::RenderSettings); }
+
+		/** @copydoc setRenderSettings() */
+		const SPtr<RenderSettingsType>& getRenderSettings() const { return mRenderSettings; }
 
 		/** Enumerates all the fields in the type and executes the specified processor action for each field. */
 		template<class P>
@@ -456,6 +489,9 @@ namespace bs
 	protected:
 		/** Viewport that describes a 2D rendering surface. */
 		SPtr<ViewportType> mViewport;
+
+		/** Settings used to control rendering for this camera. */
+		SPtr<RenderSettingsType> mRenderSettings;
 	};
 
 	/** @} */
@@ -542,7 +578,7 @@ namespace bs
 
 		/**	Retrieves an ID that can be used for uniquely identifying this object by the renderer. */
 		UINT32 getRendererId() const { return mRendererId; }
-
+		
 	protected:
 		friend class bs::Camera;
 

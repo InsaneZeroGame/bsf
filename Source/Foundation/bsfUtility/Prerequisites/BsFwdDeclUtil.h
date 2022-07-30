@@ -166,8 +166,16 @@ namespace bs
 	class ISerializable;
 	class SerializableType;
 
+	template<class T>
+	struct RTTIPlainType;
+
 	enum TypeID_Utility
 	{
+		TID_Bool = 0,
+		TID_Int32 = 1,
+		TID_UInt32 = 2,
+		// First 16 entries reserved for builtin types
+		
 		TID_Abstract = 50, // Special type ID used for Abstract classes. Only type ID that may be used by more than one class.
 		TID_WString = 51,
 		TID_Path = 52,
@@ -192,6 +200,11 @@ namespace bs
 		TID_ColorGradient = 71,
 		TID_SerializationContext = 72,
 		TID_List = 73,
-		TID_SmallVector = 74
+		TID_SmallVector = 74,
+		TID_ColorGradientHDR = 75,
+		TID_RTTISchema = 76,
+		TID_RTTIFieldSchema = 77,
+		TID_BitLength = 78,
+		TID_RTTIFieldInfo = 79
 	};
 }

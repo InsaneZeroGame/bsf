@@ -3,6 +3,7 @@
 #include "Renderer/BsRenderSettings.h"
 #include "Private/RTTI/BsRenderSettingsRTTI.h"
 #include "CoreThread/BsCoreObjectSync.h"
+#include "Image/BsTexture.h"
 
 namespace bs
 {
@@ -110,8 +111,9 @@ namespace bs
 		return getRTTIStatic();
 	}
 
+	template <bool Core>
 	template <class Processor>
-	void DepthOfFieldSettings::rttiEnumFields(Processor p)
+	void TDepthOfFieldSettings<Core>::rttiEnumFields(Processor p)
 	{
 		p(enabled);
 		p(focalDistance);
@@ -120,7 +122,20 @@ namespace bs
 		p(farTransitionRange);
 		p(nearBlurAmount);
 		p(farBlurAmount);
+		p(type);
+		p(maxBokehSize);
+		p(bokehShape);
+		p(adaptiveColorThreshold);
+		p(adaptiveRadiusThreshold);
+		p(focalLength);
+		p(apertureSize);
+		p(sensorSize);
+		p(bokehOcclusion);
+		p(occlusionDepthRange);
 	}
+
+	template struct TDepthOfFieldSettings<false>;
+	template struct TDepthOfFieldSettings<true>;
 
 	RTTITypeBase* DepthOfFieldSettings::getRTTIStatic()
 	{
@@ -203,6 +218,85 @@ namespace bs
 	}
 
 	template <class Processor>
+	void MotionBlurSettings::rttiEnumFields(Processor p)
+	{
+		p(enabled);
+		p(domain);
+		p(filter);
+		p(quality);
+		p(maximumRadius);
+	}
+
+	RTTITypeBase* MotionBlurSettings::getRTTIStatic()
+	{
+		return MotionBlurSettingsRTTI::instance();
+	}
+
+	RTTITypeBase* MotionBlurSettings::getRTTI() const
+	{
+		return getRTTIStatic();
+	}
+
+	template <class Processor>
+	void TemporalAASettings::rttiEnumFields(Processor p)
+	{
+		p(enabled);
+		p(jitteredPositionCount);
+		p(sharpness);
+	}
+
+	RTTITypeBase* TemporalAASettings::getRTTIStatic()
+	{
+		return TemporalAASettingsRTTI::instance();
+	}
+
+	RTTITypeBase* TemporalAASettings::getRTTI() const
+	{
+		return getRTTIStatic();
+	}
+
+	template <bool Core>
+	template <class Processor>
+	void TChromaticAberrationSettings<Core>::rttiEnumFields(Processor p)
+	{
+		p(enabled);
+		p(type);
+		p(shiftAmount);
+		p(fringeTexture);
+	}
+
+	template struct TChromaticAberrationSettings<false>;
+	template struct TChromaticAberrationSettings<true>;
+
+	RTTITypeBase* ChromaticAberrationSettings::getRTTIStatic()
+	{
+		return ChromaticAberrationSettingsRTTI::instance();
+	}
+
+	RTTITypeBase* ChromaticAberrationSettings::getRTTI() const
+	{
+		return getRTTIStatic();
+	}
+
+	template <class Processor>
+	void FilmGrainSettings::rttiEnumFields(Processor p)
+	{
+		p(enabled);
+		p(intensity);
+		p(speed);
+	}
+
+	RTTITypeBase* FilmGrainSettings::getRTTIStatic()
+	{
+		return FilmGrainSettingsRTTI::instance();
+	}
+
+	RTTITypeBase* FilmGrainSettings::getRTTI() const
+	{
+		return getRTTIStatic();
+	}
+
+	template <class Processor>
 	void ShadowSettings::rttiEnumFields(Processor p)
 	{
 		p(directionalShadowDistance);
@@ -221,8 +315,9 @@ namespace bs
 		return getRTTIStatic();
 	}
 
+	template <bool Core>
 	template <class Processor>
-	void RenderSettings::rttiEnumFields(Processor p)
+	void TRenderSettings<Core>::rttiEnumFields(Processor p)
 	{
 		p(enableAutoExposure);
 		p(autoExposure);
@@ -245,11 +340,21 @@ namespace bs
 		p(overlayOnly);
 		p(enableSkybox);
 		p(cullDistance);
+		p(motionBlur);
+		p(filmGrain);
+		p(chromaticAberration);
+		p(temporalAA);
+		p(enableVelocityBuffer);
 	}
 
-	template void RenderSettings::rttiEnumFields(RttiCoreSyncSize);
-	template void RenderSettings::rttiEnumFields(RttiCoreSyncWriter);
-	template void RenderSettings::rttiEnumFields(RttiCoreSyncReader);
+	template struct TRenderSettings<false>;
+	template struct TRenderSettings<true>;
+
+	template void TRenderSettings<false>::rttiEnumFields(RttiCoreSyncSize);
+	template void TRenderSettings<false>::rttiEnumFields(RttiCoreSyncWriter);
+
+	template void TRenderSettings<true>::rttiEnumFields(RttiCoreSyncSize);
+	template void TRenderSettings<true>::rttiEnumFields(RttiCoreSyncReader);
 
 	RTTITypeBase* RenderSettings::getRTTIStatic()
 	{

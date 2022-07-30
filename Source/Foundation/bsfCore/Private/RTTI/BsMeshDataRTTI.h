@@ -4,6 +4,7 @@
 
 #include "BsCorePrerequisites.h"
 #include "Reflection/BsRTTIType.h"
+#include "Reflection/BsRTTIPlain.h"
 #include "Mesh/BsMeshData.h"
 #include "RenderAPI/BsVertexDeclaration.h"
 #include "FileSystem/BsDataStream.h"
@@ -36,7 +37,7 @@ namespace bs
 		{
 			size = obj->getInternalBufferSize();
 
-			return bs_shared_ptr_new<MemoryDataStream>(obj->getData(), size, false);
+			return bs_shared_ptr_new<MemoryDataStream>(obj->getData(), size);
 		}
 
 		void setData(MeshData* obj, const SPtr<DataStream>& value, UINT32 size)

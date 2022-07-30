@@ -79,7 +79,7 @@ namespace bs
 			for (UINT32 i = 0; i < numFields; i++)
 			{
 				RTTIField* curGenericField = rtti->getField(i);
-				if (curGenericField->mIsVectorType)
+				if (curGenericField->schema.isArray)
 				{
 					const UINT32 arrayNumElemsA = curGenericField->getArraySize(rttiInstanceA, &a);
 					const UINT32 arrayNumElemsB = curGenericField->getArraySize(rttiInstanceB, &b);
@@ -87,7 +87,7 @@ namespace bs
 					if(arrayNumElemsA != arrayNumElemsB)
 						return false;
 
-					switch (curGenericField->mType)
+					switch (curGenericField->schema.type)
 					{
 					case SerializableFT_ReflectablePtr:
 					{
@@ -153,13 +153,13 @@ namespace bs
 						{
 							UINT32 typeSizeA = 0;
 							UINT32 typeSizeB = 0;
-							if (curField->hasDynamicSize())
+							if (curField->schema.hasDynamicSize)
 							{
-								typeSizeA = curField->getArrayElemDynamicSize(rttiInstanceA, &a, arrIdx);
-								typeSizeB = curField->getArrayElemDynamicSize(rttiInstanceB, &b, arrIdx);
+								typeSizeA = curField->getArrayElemDynamicSize(rttiInstanceA, &a, arrIdx, false).bytes;
+								typeSizeB = curField->getArrayElemDynamicSize(rttiInstanceB, &b, arrIdx, false).bytes;
 							}
 							else
-								typeSizeA = typeSizeB = curField->getTypeSize();
+								typeSizeA = typeSizeB = curField->schema.size.bytes;
 
 							if(typeSizeA != typeSizeB)
 								return false;
@@ -168,8 +168,11 @@ namespace bs
 							auto dataA = bs_managed_stack_alloc(typeSizeA);
 							auto dataB = bs_managed_stack_alloc(typeSizeB);
 
-							curField->arrayElemToBuffer(rttiInstanceA, &a, arrIdx, dataA);
-							curField->arrayElemToBuffer(rttiInstanceB, &b, arrIdx, dataB);
+							Bitstream streamA((uint8_t*)static_cast<void*>(dataA), typeSizeA);
+							Bitstream streamB((uint8_t*)static_cast<void*>(dataB), typeSizeB);
+
+							curField->arrayElemToStream(rttiInstanceA, &a, arrIdx, streamA);
+							curField->arrayElemToStream(rttiInstanceB, &b, arrIdx, streamB);
 
 							if(memcmp(dataA, dataB, typeSizeA) != 0)
 								return false;
@@ -179,13 +182,13 @@ namespace bs
 					}
 					default:
 						BS_EXCEPT(InternalErrorException,
-							"Error encoding data. Encountered a type I don't know how to encode. Type: " + toString(UINT32(curGenericField->mType)) +
-							", Is array: " + toString(curGenericField->mIsVectorType));
+							"Error encoding data. Encountered a type I don't know how to encode. Type: " + toString(UINT32(curGenericField->schema.type)) +
+							", Is array: " + toString(curGenericField->schema.isArray));
 					}
 				}
 				else
 				{
-					switch (curGenericField->mType)
+					switch (curGenericField->schema.type)
 					{
 					case SerializableFT_ReflectablePtr:
 					{
@@ -243,13 +246,13 @@ namespace bs
 
 						UINT32 typeSizeA = 0;
 						UINT32 typeSizeB = 0;
-						if (curField->hasDynamicSize())
+						if (curField->schema.hasDynamicSize)
 						{
-							typeSizeA = curField->getDynamicSize(rttiInstanceA, &a);
-							typeSizeB = curField->getDynamicSize(rttiInstanceB, &b);
+							typeSizeA = curField->getDynamicSize(rttiInstanceA, &a, false).bytes;
+							typeSizeB = curField->getDynamicSize(rttiInstanceB, &b, false).bytes;
 						}
 						else
-							typeSizeA = typeSizeB = curField->getTypeSize();
+							typeSizeA = typeSizeB = curField->schema.size.bytes;
 
 						if (typeSizeA != typeSizeB)
 							return false;
@@ -258,8 +261,11 @@ namespace bs
 						auto dataA = bs_managed_stack_alloc(typeSizeA);
 						auto dataB = bs_managed_stack_alloc(typeSizeB);
 
-						curField->toBuffer(rttiInstanceA, &a, dataA);
-						curField->toBuffer(rttiInstanceB, &b, dataB);
+						Bitstream streamA((uint8_t*)static_cast<void*>(dataA), typeSizeA);
+						Bitstream streamB((uint8_t*)static_cast<void*>(dataB), typeSizeB);
+
+						curField->toStream(rttiInstanceA, &a, streamA);
+						curField->toStream(rttiInstanceB, &b, streamB);
 
 						if (memcmp(dataA, dataB, typeSizeA) != 0)
 							return false;
@@ -290,8 +296,8 @@ namespace bs
 					}
 					default:
 						BS_EXCEPT(InternalErrorException,
-							"Error encoding data. Encountered a type I don't know how to encode. Type: " + toString(UINT32(curGenericField->mType)) +
-							", Is array: " + toString(curGenericField->mIsVectorType));
+							"Error encoding data. Encountered a type I don't know how to encode. Type: " + toString(UINT32(curGenericField->schema.type)) +
+							", Is array: " + toString(curGenericField->schema.isArray));
 					}
 				}
 			}

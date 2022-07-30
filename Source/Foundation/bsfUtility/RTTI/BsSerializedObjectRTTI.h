@@ -4,6 +4,7 @@
 
 #include "Prerequisites/BsPrerequisitesUtil.h"
 #include "Reflection/BsRTTIType.h"
+#include "Reflection/BsRTTIPlain.h"
 #include "Serialization/BsSerializedObject.h"
 #include "FileSystem/BsDataStream.h"
 
@@ -41,7 +42,7 @@ namespace bs
 		{
 			size = obj->size;
 
-			return bs_shared_ptr_new<MemoryDataStream>(obj->value, obj->size, false);
+			return bs_shared_ptr_new<MemoryDataStream>(obj->value, obj->size);
 		}
 
 		void setData(SerializedField* obj, const SPtr<DataStream>& value, UINT32 size)
@@ -89,9 +90,8 @@ namespace bs
 
 		void setData(SerializedDataBlock* obj, const SPtr<DataStream>& value, UINT32 size)
 		{
-			UINT8* data = (UINT8*)bs_alloc(size);
-			SPtr<MemoryDataStream> memStream = bs_shared_ptr_new<MemoryDataStream>(data, size);
-			value->read(data, size);
+			SPtr<MemoryDataStream> memStream = bs_shared_ptr_new<MemoryDataStream>(size);
+			value->read(memStream->data(), size);
 
 			obj->stream = memStream;
 			obj->size = size;

@@ -405,7 +405,6 @@ namespace bs
 
 					AnimationState& state = states[curStateIdx];
 					state.loop = clipInfo.state.wrapMode == AnimWrapMode::Loop;
-					state.time = clipInfo.state.time;
 
 					// Calculate weight if fading is active
 					float weight = clipInfo.state.weight;
@@ -429,14 +428,22 @@ namespace bs
 					if (isClipValid)
 					{
 						state.curves = clipInfo.clip->getCurves();
+						state.length = clipInfo.clip->getLength();
 						state.disabled = clipInfo.playbackType == AnimPlaybackType::None;
 					}
 					else
 					{
 						static SPtr<AnimationCurves> zeroCurves = bs_shared_ptr_new<AnimationCurves>();
 						state.curves = zeroCurves;
+						state.length = 0.0f;
 						state.disabled = true;
 					}
+
+					// Wrap time if looping
+					if (state.loop && state.length > 0.0f)
+						state.time = Math::repeat(clipInfo.state.time, state.length);
+					else
+						state.time = clipInfo.state.time;
 
 					state.positionCaches = posCache;
 					posCache += state.curves->position.size();
@@ -563,7 +570,12 @@ namespace bs
 
 			state.loop = clipInfo.state.wrapMode == AnimWrapMode::Loop;
 			state.weight = clipInfo.state.weight;
-			state.time = clipInfo.state.time;
+
+			// Wrap time if looping
+			if (state.loop && state.length > 0.0f)
+				state.time = Math::repeat(clipInfo.state.time, state.length);
+			else
+				state.time = clipInfo.state.time;
 
 			bool isLoaded = clipInfo.clip.isLoaded();
 			state.disabled = !isLoaded || clipInfo.playbackType == AnimPlaybackType::None;
@@ -624,7 +636,12 @@ namespace bs
 		for (auto& clipInfo : clipInfos)
 		{
 			AnimationState& state = layers[clipInfo.layerIdx].states[clipInfo.stateIdx];
-			state.time = clipInfo.state.time;
+
+			// Wrap time if looping
+			if (state.loop && state.length > 0.0f)
+				state.time = Math::repeat(clipInfo.state.time, state.length);
+			else
+				state.time = clipInfo.state.time;
 
 			bool isLoaded = clipInfo.clip.isLoaded();
 			state.disabled = !isLoaded || clipInfo.playbackType == AnimPlaybackType::None;
@@ -1144,6 +1161,11 @@ namespace bs
 			if (clipInfo.clip == clip)
 			{
 				state = clipInfo.state;
+
+				if (state.layer == (UINT32)-1)
+					state.layer = 0;
+				else
+					state.layer += 1;
 
 				// Internally we store unclamped time, so clamp/loop it
 				float clipLength = 0.0f;

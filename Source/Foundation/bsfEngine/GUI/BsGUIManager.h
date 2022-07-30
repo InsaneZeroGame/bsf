@@ -15,7 +15,7 @@
 #include "Utility/BsEvent.h"
 #include "Material/BsMaterialParam.h"
 #include "Renderer/BsParamBlocks.h"
-#include "RenderAPI/BsSubMesh.h"
+#include "GUI/BsGUIWidget.h"
 
 namespace bs
 {
@@ -47,46 +47,6 @@ namespace bs
 			NoDrag,
 			HeldWithoutDrag,
 			Dragging
-		};
-
-		/** Data required for rendering a single GUI mesh. */
-		struct GUIMeshData
-		{
-			UINT32 indexOffset = 0;
-			UINT32 indexCount = 0;
-			SpriteMaterial* material;
-			SpriteMaterialInfo matInfo;
-			GUIWidget* widget;
-			bool isLine;
-		};
-
-		/**	GUI render data for a single viewport. */
-		struct GUIRenderData
-		{
-			GUIRenderData()
-				:isDirty(true)
-			{ }
-
-			SPtr<Mesh> triangleMesh;
-			SPtr<Mesh> lineMesh;
-			Vector<GUIMeshData> cachedMeshes;
-			Vector<GUIWidget*> widgets;
-			bool isDirty;
-		};
-
-		/**	Render data for a single GUI group used for notifying the core GUI renderer. */
-		struct GUICoreRenderData
-		{
-			SPtr<ct::Mesh> mesh;
-			SubMesh subMesh;
-			SPtr<ct::Texture> texture;
-			SPtr<ct::SpriteTexture> spriteTexture;
-			SpriteMaterial* material;
-			Color tint;
-			float animationStartTime;
-			Matrix4 worldTransform;
-			SPtr<SpriteMaterialExtraInfo> additionalData;
-			UINT32 bufferIdx;
 		};
 
 		/**	Container for a GUI widget. */
@@ -218,7 +178,7 @@ namespace bs
 		 * @note			
 		 * Bridged element needs to remove itself as the bridge when it is destroyed.
 		 */
-		void setInputBridge(const RenderTexture* renderTex, const GUIElement* element);
+		void setInputBridge(const SPtr<RenderTexture>& renderTex, const GUIElement* element);
 
 		/**
 		 * Converts window coordinates to coordinates relative to the specified bridged render target (target displayed
@@ -237,14 +197,14 @@ namespace bs
 		 */
 		SPtr<RenderWindow> getBridgeWindow(const SPtr<RenderTexture>& target) const;
 
+		/** Returns all GUI elements that have input bridging set up and belong to the provided GUI widget. */
+		void getBridgedElements(const GUIWidget* widget, SmallVector<std::pair<const GUIElement*, SPtr<const RenderTarget>>, 4>& elements);
+
 		/**	Returns the parent render window of the specified widget. */
 		const RenderWindow* getWidgetWindow(const GUIWidget& widget) const;
 
 	private:
 		friend class ct::GUIRenderer;
-
-		/**	Recreates all dirty GUI meshes and makes them ready for rendering. */
-		void updateMeshes();
 
 		/**	Recreates the input caret texture. */
 		void updateCaretTexture();
@@ -367,13 +327,7 @@ namespace bs
 		static const UINT32 MESH_HEAP_INITIAL_NUM_INDICES;
 
 		Vector<WidgetInfo> mWidgets;
-		UnorderedMap<const Viewport*, GUIRenderData> mCachedGUIData;
-
 		SPtr<ct::GUIRenderer> mRenderer;
-		bool mCoreDirty;
-
-		SPtr<VertexDataDesc> mTriangleVertexDesc;
-		SPtr<VertexDataDesc> mLineVertexDesc;
 
 		Stack<GUIElement*> mScheduledForDestruction;
 
@@ -382,28 +336,28 @@ namespace bs
 		Vector<ElementInfoUnderPointer> mNewElementsUnderPointer;
 
 		// Element and widget that's being clicked on
-		GUIMouseButton mActiveMouseButton;
+		GUIMouseButton mActiveMouseButton = GUIMouseButton::Left;
 		Vector<ElementInfo> mActiveElements;
 		Vector<ElementInfo> mNewActiveElements;
 
 		// Element and widget that currently have the keyboard focus
 		Vector<ElementFocusInfo> mElementsInFocus;
 		Vector<ElementFocusInfo> mNewElementsInFocus;
+		UnorderedMap<RenderWindow*, Vector<ElementFocusInfo>> mSavedFocusElements;
 
 		bool mForcedClearFocus = false;
 		Vector<ElementForcedFocusInfo> mForcedFocusElements;
 
 		// Tooltip
-		bool mShowTooltip;
-		float mTooltipElementHoverStart;
+		bool mShowTooltip = false;
+		float mTooltipElementHoverStart = 0.0f;
 
-		GUIInputCaret* mInputCaret;
-		GUIInputSelection* mInputSelection;
+		GUIInputCaret* mInputCaret = nullptr;
+		GUIInputSelection* mInputSelection = nullptr;
 
-		bool mSeparateMeshesByWidget;
 		Vector2I mLastPointerScreenPos;
 
-		DragState mDragState;
+		DragState mDragState = DragState::NoDrag;
 		Vector2I mLastPointerClickPos;
 		Vector2I mDragStartPos;
 
@@ -413,16 +367,16 @@ namespace bs
 		GUIVirtualButtonEvent mVirtualButtonEvent;
 
 		HSpriteTexture mCaretTexture;
-		Color mCaretColor;
-		float mCaretBlinkInterval;
-		float mCaretLastBlinkTime;
-		bool mIsCaretOn;
-		CursorType mActiveCursor;
+		Color mCaretColor { 1.0f, 0.6588f, 0.0f };
+		float mCaretBlinkInterval = 0.5f;
+		float mCaretLastBlinkTime = 0.0f;
+		bool mIsCaretOn = false;
+		CursorType mActiveCursor = CursorType::Arrow;
 
 		HSpriteTexture mTextSelectionTexture;
-		Color mTextSelectionColor;
+		Color mTextSelectionColor { 0.0f, 114 / 255.0f, 188 / 255.0f };
 
-		Map<const RenderTexture*, const GUIElement*> mInputBridge;
+		Map<SPtr<const RenderTexture>, const GUIElement*> mInputBridge;
 
 		HEvent mOnPointerMovedConn;
 		HEvent mOnPointerPressedConn;
@@ -465,25 +419,41 @@ namespace bs
 		void initialize(const Any& data) override;
 
 		/**	@copydoc RendererExtension::check */
-		bool check(const Camera& camera) override;
+		RendererExtensionRequest check(const Camera& camera) override;
 
 		/**	@copydoc RendererExtension::render */
-		void render(const Camera& camera) override;
+		void render(const Camera& camera, const RendererViewContext& viewContext) override;
 
 	private:
 		/** Called every frame from the main thread with the time of the current frame. */
 		void update(float time);
 
-		/**
-		 * Updates the internal data that determines what will be rendered on the next render() call.
-		 *
-		 * @param[in]	perCameraData	GUI mesh/material per viewport.
-		 */
-		void updateData(const UnorderedMap<SPtr<Camera>, Vector<GUIManager::GUICoreRenderData>>& perCameraData);
+		/** Updates the data required for rendering draw groups on the specified widget. */
+		void updateDrawGroups(const SPtr<Camera>& camera, UINT64 widgetId, UINT32 widgetDepth, const Matrix4& worldTransform, 
+			const GUIDrawGroupRenderDataUpdate& data);
 
-		UnorderedMap<const Camera*, Vector<GUIManager::GUICoreRenderData>> mPerCameraData;
+		/** Clears all draw groups from the specified widget. */
+		void clearDrawGroups(const SPtr<Camera>& camera, UINT64 widgetId);
+
+		/** Updates the parameter block buffer for the specified mesh. */
+		void updateParamBlockBuffer(const SPtr<GpuParamBlockBuffer>& buffer, float invViewportWidth, float invViewportHeight, bool flipY,
+			const Matrix4& tfrm, GUIMeshRenderData& renderData) const;
+		
+		struct GUIWidgetRenderData
+		{
+			UINT64 widgetId;
+			UINT32 widgetDepth = 0;
+			Vector<GUIDrawGroupRenderData> drawGroups;
+			Vector<SPtr<GpuParamBlockBuffer>> paramBlocks;
+
+			SPtr<Mesh> triangleMesh;
+			SPtr<Mesh> lineMesh;
+			SPtr<Mesh> drawGroupMesh;
+			Matrix4 worldTransform = Matrix4::IDENTITY;
+		};
+		
+		UnorderedMap<const Camera*, Vector<GUIWidgetRenderData>> mPerCameraData;
 		Set<SPtr<Camera>> mReferencedCameras;
-		Vector<SPtr<GpuParamBlockBuffer>> mParamBlocks;
 		SPtr<SamplerState> mSamplerState;
 		float mTime = 0.0f;
 	};

@@ -15,6 +15,7 @@ namespace ct
 	class RenderCompositorNode;
 	struct PooledStorageBuffer;
 	struct FrameInfo;
+	class RCNodeLightAccumulation;
 
 	/** @addtogroup RenderBeast
 	 *  @{
@@ -211,6 +212,7 @@ namespace ct
 		SPtr<PooledRenderTexture> normalTex;
 		SPtr<PooledRenderTexture> roughMetalTex;
 		SPtr<PooledRenderTexture> idTex;
+		SPtr<PooledRenderTexture> velocityTex;
 
 		SPtr<RenderTexture> renderTarget;
 		SPtr<RenderTexture> renderTargetNoMask;
@@ -245,7 +247,16 @@ namespace ct
 		SPtr<RenderTexture> renderTarget;
 
 		/** Converts MSAA data from the texture array into the MSAA texture. */
-		void resolveMSAA();
+		void msaaTexArrayToTexture();
+
+		/**
+		 * Updates the internal scene color texture with the provided texture. MSAA scene color texture array must have
+		 * been resolved before this call. This will not update the render target.
+		 */
+		void setExternalTexture(const SPtr<PooledRenderTexture>& texture);
+
+		/** Swaps the render textures between this node and the light accumulation nodes. */
+		void swap(RCNodeLightAccumulation* lightAccumNode);
 
 		static StringID getNodeId() { return "SceneColor"; }
 		static SmallVector<StringID, 4> getDependencies(const RendererView& view);
@@ -334,7 +345,7 @@ namespace ct
 		SPtr<RenderTexture> renderTarget;
 
 		/** Converts MSAA data from the texture array into the MSAA texture. */
-		void resolveMSAA();
+		void msaaTexArrayToTexture();
 
 		static StringID getNodeId() { return "LightAccumulation"; }
 		static SmallVector<StringID, 4> getDependencies(const RendererView& view);
@@ -535,6 +546,38 @@ namespace ct
 		UINT64 mTonemapLastUpdateHash = -1;
 	};
 
+	/** Renders the depth of field effect with a Bokeh flare simulating camera aperture shape. */
+	class RCNodeBokehDOF : public RenderCompositorNode
+	{
+	public:
+		static StringID getNodeId() { return "BokehDOF"; }
+		static SmallVector<StringID, 4> getDependencies(const RendererView& view);
+	protected:
+		/** @copydoc RenderCompositorNode::render */
+		void render(const RenderCompositorNodeInputs& inputs) override;
+
+		/** @copydoc RenderCompositorNode::clear */
+		void clear() override;
+	};
+
+	/**
+	 * Renders the motion blur effect simulating light accumulation due to object and/or camera
+	 * movement during a single frame. (In another words, it simulates blur due to exposure time
+	 * as if on a real-world camera, i.e. depending on how long is the camera shutter open).
+	 */
+	class RCNodeMotionBlur : public RenderCompositorNode
+	{
+	public:
+		static StringID getNodeId() { return "MotionBlur"; }
+		static SmallVector<StringID, 4> getDependencies(const RendererView & view);
+	protected:
+		/** @copydoc RenderCompositorNode::render */
+		void render(const RenderCompositorNodeInputs& inputs) override;
+
+		/** @copydoc RenderCompositorNode::clear */
+		void clear() override;
+	};
+
 	/** Renders the depth of field effect using Gaussian blurring. */
 	class RCNodeGaussianDOF : public RenderCompositorNode
 	{
@@ -677,6 +720,34 @@ namespace ct
 
 		SPtr<PooledRenderTexture> mPooledOutput;
 		SPtr<PooledRenderTexture> mPrevFrame;
+		bool mUsingTemporalAA = false;
+	};
+
+	/**
+	 * Performs temporal anti-aliasing, using a special filter to accumulate multiple frames and thus
+	 * improving image quality via temporal filtering.
+	 */
+	class RCNodeTemporalAA : public RenderCompositorNode
+	{
+	public:
+		SPtr<Texture> output;
+
+		~RCNodeTemporalAA();
+
+		static StringID getNodeId() { return "TemporalAA"; }
+		static SmallVector<StringID, 4> getDependencies(const RendererView& view);
+	protected:
+		/** @copydoc RenderCompositorNode::render */
+		void render(const RenderCompositorNodeInputs& inputs) override;
+
+		/** @copydoc RenderCompositorNode::clear */
+		void clear() override;
+
+		/** Cleans up any outputs. */
+		void deallocOutputs();
+
+		SPtr<PooledRenderTexture> mPooledOutput;
+		SPtr<PooledRenderTexture> mPrevFrame;
 	};
 
 	/** Renders the bloom effect. */
@@ -703,6 +774,34 @@ namespace ct
 	public:
 		static StringID getNodeId() { return "ScreenSpaceLensFlare"; }
 		static SmallVector<StringID, 4> getDependencies(const RendererView& view);
+	protected:
+		/** @copydoc RenderCompositorNode::render */
+		void render(const RenderCompositorNodeInputs& inputs) override;
+
+		/** @copydoc RenderCompositorNode::clear */
+		void clear() override;
+	};
+
+	/** Renders the chromatic aberration effect. */
+	class RCNodeChromaticAberration : public RenderCompositorNode
+	{
+	public:
+		static StringID getNodeId() { return "ChromaticAberration"; }
+		static SmallVector<StringID, 4> getDependencies(const RendererView & view);
+	protected:
+		/** @copydoc RenderCompositorNode::render */
+		void render(const RenderCompositorNodeInputs& inputs) override;
+
+		/** @copydoc RenderCompositorNode::clear */
+		void clear() override;
+	};
+
+	/** Renders the film grain effect. */
+	class RCNodeFilmGrain : public RenderCompositorNode
+	{
+	public:
+		static StringID getNodeId() { return "FilmGrain"; }
+		static SmallVector<StringID, 4> getDependencies(const RendererView & view);
 	protected:
 		/** @copydoc RenderCompositorNode::render */
 		void render(const RenderCompositorNodeInputs& inputs) override;

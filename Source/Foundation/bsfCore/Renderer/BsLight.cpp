@@ -240,16 +240,16 @@ namespace bs
 	CoreSyncData Light::syncToCore(FrameAlloc* allocator)
 	{
 		UINT32 size = 0;
-		size += rttiGetElemSize(getCoreDirtyFlags());
-		size += coreSyncGetElemSize((SceneActor&)*this);
-		size += coreSyncGetElemSize(*this);
+		size += rtti_size(getCoreDirtyFlags()).bytes;
+		size += csync_size((SceneActor&)*this);
+		size += csync_size(*this);
 
 		UINT8* buffer = allocator->alloc(size);
 
-		char* dataPtr = (char*)buffer;
-		dataPtr = rttiWriteElem(getCoreDirtyFlags(), dataPtr);
-		dataPtr = coreSyncWriteElem((SceneActor&)*this, dataPtr);
-		dataPtr = coreSyncWriteElem(*this, dataPtr);
+		Bitstream stream(buffer, size);
+		rtti_write(getCoreDirtyFlags(), stream);
+		csync_write((SceneActor&)*this, stream);
+		csync_write(*this, stream);
 
 		return CoreSyncData(buffer, size);
 	}
@@ -296,15 +296,15 @@ namespace bs
 
 	void Light::syncToCore(const CoreSyncData& data)
 	{
-		char* dataPtr = (char*)data.getBuffer();
+		Bitstream stream(data.getBuffer(), data.getBufferSize());
 
 		UINT32 dirtyFlags = 0;
 		bool oldIsActive = mActive;
 		LightType oldType = mType;
 
-		dataPtr = rttiReadElem(dirtyFlags, dataPtr);
-		dataPtr = coreSyncReadElem((SceneActor&)*this, dataPtr);
-		dataPtr = coreSyncReadElem(*this, dataPtr);
+		rtti_read(dirtyFlags, stream);
+		csync_read((SceneActor&)*this, stream);
+		csync_read(*this, stream);
 
 		updateBounds();
 

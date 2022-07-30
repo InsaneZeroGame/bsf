@@ -2,12 +2,16 @@
 //*********** Licensed under the MIT license. See LICENSE.md for full terms. This notice is not to be removed. ***********//
 #pragma once
 
+#include <utility>
 #include "Prerequisites/BsPrerequisitesUtil.h"
+#include "Reflection/BsRTTIPlain.h"
+#include "Reflection/BsIReflectable.h"
 #include "Utility/BsAny.h"
 
 namespace bs
 {
 	class RTTITypeBase;
+	struct RTTISchema;
 
 	/** @addtogroup Internal-Utility
 	 *  @{
@@ -43,53 +47,27 @@ namespace bs
 		SerializableFT_ReflectablePtr
 	};
 
-	/** Various flags you can assign to RTTI fields. */
-	enum class RTTIFieldFlag
+	/** Contains serializable meta-data about a single RTTI field. */
+	struct BS_UTILITY_EXPORT RTTIFieldSchema : IReflectable
 	{
-		/**
-		 * This flag is only used on field types of ReflectablePtr type, and it is used
-		 * to solve circular references. Circular references cause an issue when deserializing,
-		 * as the algorithm doesn't know which object to deserialize first. By making one of
-		 * the references weak, you tell the algorithm that it doesn't have to guarantee
-		 * the object will be fully deserialized before being assigned to the field.
-		 *
-		 * In short: If you make a reference weak, when "set" method of that field is called,
-		 * it is not guaranteed the value provided is fully initialized, so you should not access any of its
-		 * data until deserialization is fully complete. You only need to use this flag if the RTTI system
-		 * complains that is has found a circular reference.
-		 */
-		WeakRef = 1 << 0,
-		/**
-		 * This flags signals various systems that the flagged field should not be searched when looking for
-		 * object references. This normally means the value of this field will no be retrieved during reference
-		 * searches but it will likely still be retrieved during other operations (for example serialization).
-		 * This is used as an optimization to avoid retrieving values of potentially very expensive fields that
-		 * would not contribute to the reference search anyway. Whether or not a field contributes to the reference
-		 * search depends on the search and should be handled on a case by case basis.
-		 */
-		SkipInReferenceSearch = 1 << 1,
-		/**
-		 * Lets the replication system know that this field should be monitored for changes and replicated across the
-		 * network when changes are detected.
-		 */
-		Replicate = 1 << 2
-	};
-
-	typedef Flags<RTTIFieldFlag> RTTIFieldFlags;
-	BS_FLAGS_OPERATORS(RTTIFieldFlag)
-
-	/** Provides various optional information regarding a RTTI field. */
-	struct BS_UTILITY_EXPORT RTTIFieldInfo
-	{
-		RTTIFieldFlags flags;
-
-		RTTIFieldInfo() = default;
-
-		RTTIFieldInfo(RTTIFieldFlags flags)
-			:flags(flags)
+		RTTIFieldSchema() = default;
+		RTTIFieldSchema(INT16 id, bool isArray, bool hasDynamicSize, BitLength size, SerializableFieldType type,
+			UINT32 fieldTypeId, SPtr<RTTISchema> fieldTypeSchema, const RTTIFieldInfo& info)
+			: id(id), isArray(isArray), hasDynamicSize(hasDynamicSize), size(size), type(type)
+			, fieldTypeId(fieldTypeId), fieldTypeSchema(std::move(fieldTypeSchema)), info(info)
 		{ }
+		
+		UINT16 id = 0;
+		bool isArray = false;
+		bool hasDynamicSize = false;
+		BitLength size = 0;
+		SerializableFieldType type = SerializableFT_Plain;
+		UINT32 fieldTypeId = 0;
+		SPtr<RTTISchema> fieldTypeSchema;
+		RTTIFieldInfo info;
 
-		static RTTIFieldInfo DEFAULT;
+		static RTTITypeBase* getRTTIStatic();
+		RTTITypeBase* getRTTI() const override;
 	};
 
 	/**
@@ -105,31 +83,10 @@ namespace bs
 	 */
 	struct BS_UTILITY_EXPORT RTTIField
 	{	
-		String mName;
-		UINT16 mUniqueId;
-		bool mIsVectorType;
-		SerializableFieldType mType;
-		RTTIFieldInfo mInfo;
-
+		String name;
+		RTTIFieldSchema schema;
+		
 		virtual ~RTTIField() = default;
-
-		/** Checks is the field plain type and castable to RTTIPlainFieldBase. */
-		bool isPlainType() const { return mType == SerializableFT_Plain; }
-
-		/** Checks is the field a data block type and castable to RTTIManagedDataBlockFieldBase. */
-		bool isDataBlockType() const { return mType == SerializableFT_DataBlock; }
-
-		/** Checks is the field a reflectable type and castable to RTTIReflectableFieldBase. */
-		bool isReflectableType() const { return mType == SerializableFT_Reflectable; }
-
-		/** Checks is the field a reflectable pointer type and castable to RTTIReflectablePtrFieldBase. */
-		bool isReflectablePtrType() const { return mType == SerializableFT_ReflectablePtr; }
-
-		/** Checks is the field contains an array or a single entry. */
-		bool isArray() const { return mIsVectorType; }
-
-		/** Returns additional information about the field. */
-		const RTTIFieldInfo& getInfo() const { return mInfo; }
 
 		/**
 		 * Gets the size of an array contained by the field, if the field represents an array. Throws exception if field
@@ -143,65 +100,22 @@ namespace bs
 		 */
 		virtual void setArraySize(RTTITypeBase* rtti, void* object, UINT32 size) = 0;
 
-		/** Returns the type id for the type used in this field. */
-		virtual UINT32 getTypeSize() = 0;
-
-		/**
-		 * Query if the field has dynamic size.
-		 *
-		 * @note	
-		 * Field should have dynamic size if:
-		 *  - The field can have varying size
-		 * 	- The field size is over 255
-		 * @note			
-		 * Types like integers, floats, bools, POD structs dont have dynamic size.
-		 * Types like strings, vectors, maps do.
-		 * @note		
-		 * If your type has a static size but that size exceeds 255 bytes you also need to
-		 * use dynamic field size. (You will be warned during compilation if you don't follow this rule)
-		 */
-		virtual bool hasDynamicSize() = 0;
-
-		/**
-		 * Throws an exception if this field doesn't contain a plain value.
-		 *
-		 * @param[in]	array	If true then the field must support plain array type.
-		 */
-		void checkIsPlain(bool array);
-
-		/**
-		 * Throws an exception if this field doesn't contain a complex value.
-		 *
-		 * @param[in]	array	If true then the field must support complex array type.
-		 */
-		void checkIsComplex(bool array);
-
-		/**
-		 * Throws an exception if this field doesn't contain a complex pointer value.
-		 *
-		 * @param[in]	array	If true then the field must support complex pointer array type.
-		 */
-		void checkIsComplexPtr(bool array);
-
+		/** Initializes the field's RTTI schema. Should be called once after construction. */
+		virtual void initSchema() {}
+		
 		/**
 		 * Throws an exception depending if the field is or isn't an array.
 		 *
 		 * @param[in]	array	If true, then exception will be thrown if field is not an array.
 		 * 						If false, then it will be thrown if field is an array.
 		 */
-		void checkIsArray(bool array);
-
-		/** Throws an exception if this field doesn't contain a data block value. */
-		void checkIsDataBlock();
+		void checkIsArray(bool array) const;
 
 	protected:
-		void init(String name, UINT16 uniqueId, bool isVectorType, SerializableFieldType type, const RTTIFieldInfo& info)
+		void init(String name, const RTTIFieldSchema& schema)
 		{
-			this->mName = std::move(name);
-			this->mUniqueId = uniqueId;
-			this->mIsVectorType = isVectorType;
-			this->mType = type;
-			this->mInfo = info;
+			this->name = std::move(name);
+			this->schema = schema;
 		}
 	};
 

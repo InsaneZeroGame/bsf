@@ -4,6 +4,11 @@
 
 #include "BsCorePrerequisites.h"
 #include "Reflection/BsRTTIType.h"
+#include "RTTI/BsStringIDRTTI.h"
+#include "RTTI/BsStringRTTI.h"
+#include "RTTI/BsStdRTTI.h"
+#include "RTTI/BsSmallVectorRTTI.h"
+#include "RTTI/BsFlagsRTTI.h"
 #include "Material/BsShader.h"
 #include "Material/BsMaterial.h"
 
@@ -18,52 +23,51 @@ namespace bs
 	{
 		enum { id = TID_SHADER_DATA_PARAM_DESC }; enum { hasDynamicSize = 1 };
 
-		static void toMemory(const SHADER_DATA_PARAM_DESC& data, char* memory)
+		static BitLength toMemory(const SHADER_DATA_PARAM_DESC& data, Bitstream& stream, const RTTIFieldInfo& fieldInfo, bool compress)
 		{
 			static constexpr UINT32 VERSION = 1;
 
-			UINT32 size = getDynamicSize(data);
+			return rtti_write_with_size_header(stream, data, compress, [&data, &stream]()
+			{
+				BitLength size = 0;
 
-			UINT32 curSize = sizeof(UINT32);
-			memcpy(memory, &size, curSize);
-			memory += curSize;
+				size += rtti_write(data.arraySize, stream);
+				size += rtti_write(data.rendererSemantic, stream);
+				size += rtti_write(data.type, stream);
+				size += rtti_write(data.name, stream);
+				size += rtti_write(data.gpuVariableName, stream);
+				size += rtti_write(data.elementSize, stream);
+				size += rtti_write(data.defaultValueIdx, stream);
+				size += rtti_write(VERSION, stream);
+				size += rtti_write(data.attribIdx, stream);
 
-			memory = rttiWriteElem(data.arraySize, memory);
-			memory = rttiWriteElem(data.rendererSemantic, memory);
-			memory = rttiWriteElem(data.type, memory);
-			memory = rttiWriteElem(data.name, memory);
-			memory = rttiWriteElem(data.gpuVariableName, memory);
-			memory = rttiWriteElem(data.elementSize, memory);
-			memory = rttiWriteElem(data.defaultValueIdx, memory);
-			memory = rttiWriteElem(VERSION, memory);
-			memory = rttiWriteElem(data.attribIdx, memory);
+				return size;
+			});
 		}
 
-		static UINT32 fromMemory(SHADER_DATA_PARAM_DESC& data, char* memory)
+		static BitLength fromMemory(SHADER_DATA_PARAM_DESC& data, Bitstream& stream, const RTTIFieldInfo& fieldInfo, bool compress)
 		{
-			UINT32 size;
-			memcpy(&size, memory, sizeof(UINT32));
-			memory += sizeof(UINT32);
+			BitLength size;
+			BitLength sizeRead = rtti_read_size_header(stream, compress, size);
 
-			UINT32 sizeRead = sizeof(UINT32);
-			memory = rttiReadElem(data.arraySize, memory, sizeRead);
-			memory = rttiReadElem(data.rendererSemantic, memory, sizeRead);
-			memory = rttiReadElem(data.type, memory, sizeRead);
-			memory = rttiReadElem(data.name, memory, sizeRead);
-			memory = rttiReadElem(data.gpuVariableName, memory, sizeRead);
-			memory = rttiReadElem(data.elementSize, memory, sizeRead);
-			memory = rttiReadElem(data.defaultValueIdx, memory, sizeRead);
+			sizeRead += rtti_read(data.arraySize, stream);
+			sizeRead += rtti_read(data.rendererSemantic, stream);
+			sizeRead += rtti_read(data.type, stream);
+			sizeRead += rtti_read(data.name, stream);
+			sizeRead += rtti_read(data.gpuVariableName, stream);
+			sizeRead += rtti_read(data.elementSize, stream);
+			sizeRead += rtti_read(data.defaultValueIdx, stream);
 
 			// There's more to read, meaning we're reading a newer version of the format
 			// (In the first version, version field is missing, so we check this way).
 			if(sizeRead < size)
 			{
-				UINT32 version = 0;
-				memory = rttiReadElem(version, memory);
+				uint32_t version = 0;
+				rtti_read(version, stream);
 				switch(version)
 				{
 				case 1:
-					memory = rttiReadElem(data.attribIdx, memory);
+					rtti_read(data.attribIdx, stream);
 					break;
 				default:
 					BS_LOG(Error, RTTI, "Unknown version. Unable to deserialize.");
@@ -74,20 +78,14 @@ namespace bs
 			return size;
 		}
 
-		static UINT32 getDynamicSize(const SHADER_DATA_PARAM_DESC& data)
+		static BitLength getSize(const SHADER_DATA_PARAM_DESC& data, const RTTIFieldInfo& fieldInfo, bool compress)
 		{
-			UINT64 dataSize = rttiGetElemSize(data.arraySize) + rttiGetElemSize(data.rendererSemantic) + rttiGetElemSize(data.type) +
-				rttiGetElemSize(data.name) + rttiGetElemSize(data.gpuVariableName) + rttiGetElemSize(data.elementSize) +
-				rttiGetElemSize(data.defaultValueIdx) + rttiGetElemSize(data.attribIdx) + sizeof(UINT32) * 2;
+			BitLength dataSize = rtti_size(data.arraySize) + rtti_size(data.rendererSemantic) + rtti_size(data.type) +
+				rtti_size(data.name) + rtti_size(data.gpuVariableName) + rtti_size(data.elementSize) +
+				rtti_size(data.defaultValueIdx) + rtti_size(data.attribIdx) + sizeof(uint32_t);
 
-#if BS_DEBUG_MODE
-			if(dataSize > std::numeric_limits<UINT32>::max())
-			{
-				BS_EXCEPT(InternalErrorException, "Data overflow! Size doesn't fit into 32 bits.");
-			}
-#endif
-
-			return (UINT32)dataSize;
+			rtti_add_header_size(dataSize, compress);
+			return dataSize;
 		}
 	};
 
@@ -95,48 +93,46 @@ namespace bs
 	{
 		enum { id = TID_SHADER_OBJECT_PARAM_DESC }; enum { hasDynamicSize = 1 };
 
-		static void toMemory(const SHADER_OBJECT_PARAM_DESC& data, char* memory)
+		static BitLength toMemory(const SHADER_OBJECT_PARAM_DESC& data, Bitstream& stream, const RTTIFieldInfo& fieldInfo, bool compress)
 		{
-			static constexpr UINT32 VERSION = 1;
+			static constexpr uint32_t VERSION = 1;
 
-			UINT32 size = getDynamicSize(data);
+			return rtti_write_with_size_header(stream, data, compress, [&data, &stream]()
+			{
+				BitLength size = 0;
+				size += rtti_write(data.rendererSemantic, stream);
+				size += rtti_write(data.type, stream);
+				size += rtti_write(data.name, stream);
+				size += rtti_write(data.gpuVariableNames, stream);
+				size += rtti_write(data.defaultValueIdx, stream);
+				size += rtti_write(VERSION, stream);
+				size += rtti_write(data.attribIdx, stream);
 
-			UINT32 curSize = sizeof(UINT32);
-			memcpy(memory, &size, curSize);
-			memory += curSize;
-
-			memory = rttiWriteElem(data.rendererSemantic, memory);
-			memory = rttiWriteElem(data.type, memory);
-			memory = rttiWriteElem(data.name, memory);
-			memory = rttiWriteElem(data.gpuVariableNames, memory);
-			memory = rttiWriteElem(data.defaultValueIdx, memory);
-			memory = rttiWriteElem(VERSION, memory);
-			memory = rttiWriteElem(data.attribIdx, memory);
+				return size;
+			});
 		}
 
-		static UINT32 fromMemory(SHADER_OBJECT_PARAM_DESC& data, char* memory)
+		static BitLength fromMemory(SHADER_OBJECT_PARAM_DESC& data, Bitstream& stream, const RTTIFieldInfo& fieldInfo, bool compress)
 		{
-			UINT32 size;
-			memcpy(&size, memory, sizeof(UINT32));
-			memory += sizeof(UINT32);
+			BitLength size;
+			BitLength sizeRead = rtti_read_size_header(stream, compress, size);
 
-			UINT32 sizeRead = sizeof(UINT32);
-			memory = rttiReadElem(data.rendererSemantic, memory, sizeRead);
-			memory = rttiReadElem(data.type, memory, sizeRead);
-			memory = rttiReadElem(data.name, memory, sizeRead);
-			memory = rttiReadElem(data.gpuVariableNames, memory, sizeRead);
-			memory = rttiReadElem(data.defaultValueIdx, memory, sizeRead);
+			sizeRead += rtti_read(data.rendererSemantic, stream);
+			sizeRead += rtti_read(data.type, stream);
+			sizeRead += rtti_read(data.name, stream);
+			sizeRead += rtti_read(data.gpuVariableNames, stream);
+			sizeRead += rtti_read(data.defaultValueIdx, stream);
 
 			// There's more to read, meaning we're reading a newer version of the format
 			// (In the first version, version field is missing, so we check this way).
 			if(sizeRead < size)
 			{
-				UINT32 version = 0;
-				memory = rttiReadElem(version, memory);
+				uint32_t version = 0;
+				rtti_read(version, stream);
 				switch(version)
 				{
 				case 1:
-					memory = rttiReadElem(data.attribIdx, memory);
+					rtti_read(data.attribIdx, stream);
 					break;
 				default:
 					BS_LOG(Error, RTTI, "Unknown version. Unable to deserialize.");
@@ -147,20 +143,14 @@ namespace bs
 			return size;
 		}
 
-		static UINT32 getDynamicSize(const SHADER_OBJECT_PARAM_DESC& data)
+		static BitLength getSize(const SHADER_OBJECT_PARAM_DESC& data, const RTTIFieldInfo& fieldInfo, bool compress)
 		{
-			UINT64 dataSize = rttiGetElemSize(data.rendererSemantic) + rttiGetElemSize(data.type) +
-				rttiGetElemSize(data.name) + rttiGetElemSize(data.gpuVariableNames) +
-				rttiGetElemSize(data.defaultValueIdx) + rttiGetElemSize(data.attribIdx) + sizeof(UINT32) * 2;
+			BitLength dataSize = rtti_size(data.rendererSemantic) + rtti_size(data.type) +
+				rtti_size(data.name) + rtti_size(data.gpuVariableNames) +
+				rtti_size(data.defaultValueIdx) + rtti_size(data.attribIdx) + sizeof(uint32_t);
 
-#if BS_DEBUG_MODE
-			if(dataSize > std::numeric_limits<UINT32>::max())
-			{
-				BS_EXCEPT(InternalErrorException, "Data overflow! Size doesn't fit into 32 bits.");
-			}
-#endif
-
-			return (UINT32)dataSize;
+			rtti_add_header_size(dataSize, compress);
+			return dataSize;
 		}
 	};
 
@@ -168,47 +158,40 @@ namespace bs
 	{
 		enum { id = TID_SHADER_PARAM_BLOCK_DESC }; enum { hasDynamicSize = 1 };
 
-		static void toMemory(const SHADER_PARAM_BLOCK_DESC& data, char* memory)
+		static BitLength toMemory(const SHADER_PARAM_BLOCK_DESC& data, Bitstream& stream, const RTTIFieldInfo& fieldInfo, bool compress)
 		{
-			UINT32 size = getDynamicSize(data);
+			return rtti_write_with_size_header(stream, data, compress, [&data, &stream]()
+			{
+				BitLength size = 0;
+				size += rtti_write(data.shared, stream);
+				size += rtti_write(data.usage, stream);
+				size += rtti_write(data.name, stream);
+				size += rtti_write(data.rendererSemantic, stream);
 
-			UINT32 curSize = sizeof(UINT32);
-			memcpy(memory, &size, curSize);
-			memory += curSize;
-
-			memory = rttiWriteElem(data.shared, memory);
-			memory = rttiWriteElem(data.usage, memory);
-			memory = rttiWriteElem(data.name, memory);
-			rttiWriteElem(data.rendererSemantic, memory);
+				return size;
+			});
 		}
 
-		static UINT32 fromMemory(SHADER_PARAM_BLOCK_DESC& data, char* memory)
+		static BitLength fromMemory(SHADER_PARAM_BLOCK_DESC& data, Bitstream& stream, const RTTIFieldInfo& fieldInfo, bool compress)
 		{
-			UINT32 size;
-			memcpy(&size, memory, sizeof(UINT32));
-			memory += sizeof(UINT32);
+			BitLength size;
+			rtti_read_size_header(stream, compress, size);
 
-			memory = rttiReadElem(data.shared, memory);
-			memory = rttiReadElem(data.usage, memory);
-			memory = rttiReadElem(data.name, memory);
-			rttiReadElem(data.rendererSemantic, memory);
+			rtti_read(data.shared, stream);
+			rtti_read(data.usage, stream);
+			rtti_read(data.name, stream);
+			rtti_read(data.rendererSemantic, stream);
 
 			return size;
 		}
 
-		static UINT32 getDynamicSize(const SHADER_PARAM_BLOCK_DESC& data)
+		static BitLength getSize(const SHADER_PARAM_BLOCK_DESC& data, const RTTIFieldInfo& fieldInfo, bool compress)
 		{
-			UINT64 dataSize = rttiGetElemSize(data.shared) + rttiGetElemSize(data.usage) +
-				rttiGetElemSize(data.name) + rttiGetElemSize(data.rendererSemantic) + sizeof(UINT32);
+			BitLength dataSize = rtti_size(data.shared) + rtti_size(data.usage) +
+				rtti_size(data.name) + rtti_size(data.rendererSemantic);
 
-#if BS_DEBUG_MODE
-			if(dataSize > std::numeric_limits<UINT32>::max())
-			{
-				BS_EXCEPT(InternalErrorException, "Data overflow! Size doesn't fit into 32 bits.");
-			}
-#endif
-
-			return (UINT32)dataSize;
+			rtti_add_header_size(dataSize, compress);
+			return dataSize;
 		}
 	};
 
@@ -216,37 +199,36 @@ namespace bs
 	{
 		enum { id = TID_SHADER_PARAM_ATTRIBUTE }; enum { hasDynamicSize = 1 };
 
-		static void toMemory(const SHADER_PARAM_ATTRIBUTE& data, char* memory)
+		static BitLength toMemory(const SHADER_PARAM_ATTRIBUTE& data, Bitstream& stream, const RTTIFieldInfo& fieldInfo, bool compress)
 		{
 			static constexpr UINT32 VERSION = 0;
 
-			UINT32 size = getDynamicSize(data);
+			return rtti_write_with_size_header(stream, data, compress, [&data, &stream]()
+			{
+				BitLength size = 0;
+				size += rtti_write(VERSION, stream);
+				size += rtti_write(data.type, stream);
+				size += rtti_write(data.value, stream);
+				size += rtti_write(data.nextParamIdx, stream);
 
-			UINT32 curSize = sizeof(UINT32);
-			memcpy(memory, &size, curSize);
-			memory += curSize;
-
-			memory = rttiWriteElem(VERSION, memory);
-			memory = rttiWriteElem(data.type, memory);
-			memory = rttiWriteElem(data.value, memory);
-			memory = rttiWriteElem(data.nextParamIdx, memory);
+				return size;
+			});
 		}
 
-		static UINT32 fromMemory(SHADER_PARAM_ATTRIBUTE& data, char* memory)
+		static BitLength fromMemory(SHADER_PARAM_ATTRIBUTE& data, Bitstream& stream, const RTTIFieldInfo& fieldInfo, bool compress)
 		{
-			UINT32 size;
-			memcpy(&size, memory, sizeof(UINT32));
-			memory += sizeof(UINT32);
+			BitLength size;
+			rtti_read_size_header(stream, compress, size);
 
-			UINT32 version = 0;
-			memory = rttiReadElem(version, memory);
+			uint32_t version = 0;
+			rtti_read(version, stream);
 
 			switch(version)
 			{
 			case 0:
-				memory = rttiReadElem(data.type, memory);
-				memory = rttiReadElem(data.value, memory);
-				memory = rttiReadElem(data.nextParamIdx, memory);
+				rtti_read(data.type, stream);
+				rtti_read(data.value, stream);
+				rtti_read(data.nextParamIdx, stream);
 				break;
 			default:
 				BS_LOG(Error, RTTI, "Unknown version. Unable to deserialize.");
@@ -256,19 +238,13 @@ namespace bs
 			return size;
 		}
 
-		static UINT32 getDynamicSize(const SHADER_PARAM_ATTRIBUTE& data)
+		static BitLength getSize(const SHADER_PARAM_ATTRIBUTE& data, const RTTIFieldInfo& fieldInfo, bool compress)
 		{
-			UINT64 dataSize = rttiGetElemSize(data.type) + rttiGetElemSize(data.value) +
-				rttiGetElemSize(data.nextParamIdx) + sizeof(UINT32) * 2;
+			BitLength dataSize = rtti_size(data.type) + rtti_size(data.value) +
+				rtti_size(data.nextParamIdx) + sizeof(uint32_t);
 
-#if BS_DEBUG_MODE
-			if(dataSize > std::numeric_limits<UINT32>::max())
-			{
-				BS_EXCEPT(InternalErrorException, "Data overflow! Size doesn't fit into 32 bits.");
-			}
-#endif
-
-			return (UINT32)dataSize;
+			rtti_add_header_size(dataSize, compress);
+			return dataSize;
 		}
 	};
 
@@ -277,47 +253,46 @@ namespace bs
 		enum { id = TID_ShaderVariationParamValue }; enum { hasDynamicSize = 1 };
 
 		/** @copydoc RTTIPlainType::toMemory */
-		static void toMemory(const ShaderVariationParamValue& data, char* memory)
+		static BitLength toMemory(const ShaderVariationParamValue& data, Bitstream& stream, const RTTIFieldInfo& fieldInfo, bool compress)
 		{
-			static constexpr UINT8 VERSION = 0;
+			static constexpr uint8_t VERSION = 0;
 
-			UINT32 size = sizeof(UINT32);
-			char* memoryStart = memory;
-			memory += sizeof(UINT32);
+			return rtti_write_with_size_header(stream, data, compress, [&data, &stream]()
+			{
+				BitLength size = 0;
+				size += rtti_write(VERSION, stream);
+				size += rtti_write(data.name, stream);
+				size += rtti_write(data.value, stream);
 
-			memory = rttiWriteElem(VERSION, memory, size);
-			memory = rttiWriteElem(data.name, memory, size);
-			memory = rttiWriteElem(data.value, memory, size);
-
-			memcpy(memoryStart, &size, sizeof(UINT32));
+				return size;
+			});
 		}
 
 		/** @copydoc RTTIPlainType::fromMemory */
-		static UINT32 fromMemory(ShaderVariationParamValue& data, char* memory)
+		static BitLength fromMemory(ShaderVariationParamValue& data, Bitstream& stream, const RTTIFieldInfo& fieldInfo, bool compress)
 		{
-			UINT32 size = 0;
-			memory = rttiReadElem(size, memory);
+			BitLength size;
+			rtti_read_size_header(stream, compress, size);
 
-			UINT8 version;
-			memory = rttiReadElem(version, memory);
+			uint8_t version;
+			rtti_read(version, stream);
 			assert(version == 0);
 
-			memory = rttiReadElem(data.name, memory);
-			memory = rttiReadElem(data.value, memory);
+			rtti_read(data.name, stream);
+			rtti_read(data.value, stream);
 
 			return size;
 		}
 
-		/** @copydoc RTTIPlainType::getDynamicSize */
-		static UINT32 getDynamicSize(const ShaderVariationParamValue& data)
+		/** @copydoc RTTIPlainType::getSize */
+		static BitLength getSize(const ShaderVariationParamValue& data, const RTTIFieldInfo& fieldInfo, bool compress)
 		{
-			UINT64 dataSize = sizeof(UINT8) + sizeof(UINT32);
-			dataSize += rttiGetElemSize(data.name);
-			dataSize += rttiGetElemSize(data.value);
+			BitLength dataSize = sizeof(uint8_t);
+			dataSize += rtti_size(data.name);
+			dataSize += rtti_size(data.value);
 
-			assert(dataSize <= std::numeric_limits<UINT32>::max());
-
-			return (UINT32)dataSize;
+			rtti_add_header_size(dataSize, compress);
+			return dataSize;
 		}
 	};
 
@@ -326,53 +301,52 @@ namespace bs
 		enum { id = TID_ShaderVariationParamInfo }; enum { hasDynamicSize = 1 };
 
 		/** @copydoc RTTIPlainType::toMemory */
-		static void toMemory(const ShaderVariationParamInfo& data, char* memory)
+		static BitLength toMemory(const ShaderVariationParamInfo& data, Bitstream& stream, const RTTIFieldInfo& fieldInfo, bool compress)
 		{
-			static constexpr UINT8 VERSION = 0;
+			static constexpr uint8_t VERSION = 0;
 
-			UINT32 size = sizeof(UINT32);
-			char* memoryStart = memory;
-			memory += sizeof(UINT32);
+			return rtti_write_with_size_header(stream, data, compress, [&data, &stream]()
+			{
+				BitLength size = 0;
+				size += rtti_write(VERSION, stream);
+				size += rtti_write(data.name, stream);
+				size += rtti_write(data.identifier, stream);
+				size += rtti_write(data.isInternal, stream);
+				size += rtti_write(data.values, stream);
 
-			memory = rttiWriteElem(VERSION, memory, size);
-			memory = rttiWriteElem(data.name, memory, size);
-			memory = rttiWriteElem(data.identifier, memory, size);
-			memory = rttiWriteElem(data.isInternal, memory, size);
-			memory = rttiWriteElem(data.values, memory, size);
-
-			memcpy(memoryStart, &size, sizeof(UINT32));
+				return size;
+			});
 		}
 
 		/** @copydoc RTTIPlainType::fromMemory */
-		static UINT32 fromMemory(ShaderVariationParamInfo& data, char* memory)
+		static BitLength fromMemory(ShaderVariationParamInfo& data, Bitstream& stream, const RTTIFieldInfo& fieldInfo, bool compress)
 		{
-			UINT32 size = 0;
-			memory = rttiReadElem(size, memory);
+			BitLength size;
+			rtti_read_size_header(stream, compress, size);
 
-			UINT8 version;
-			memory = rttiReadElem(version, memory);
+			uint8_t version;
+			rtti_read(version, stream);
 			assert(version == 0);
 
-			memory = rttiReadElem(data.name, memory);
-			memory = rttiReadElem(data.identifier, memory);
-			memory = rttiReadElem(data.isInternal, memory);
-			memory = rttiReadElem(data.values, memory);
+			rtti_read(data.name, stream);
+			rtti_read(data.identifier, stream);
+			rtti_read(data.isInternal, stream);
+			rtti_read(data.values, stream);
 
 			return size;
 		}
 
-		/** @copydoc RTTIPlainType::getDynamicSize */
-		static UINT32 getDynamicSize(const ShaderVariationParamInfo& data)
+		/** @copydoc RTTIPlainType::getSize */
+		static BitLength getSize(const ShaderVariationParamInfo& data, const RTTIFieldInfo& fieldInfo, bool compress)
 		{
-			UINT64 dataSize = sizeof(UINT8) + sizeof(UINT32);
-			dataSize += rttiGetElemSize(data.name);
-			dataSize += rttiGetElemSize(data.identifier);
-			dataSize += rttiGetElemSize(data.isInternal);
-			dataSize += rttiGetElemSize(data.values);
+			BitLength dataSize = sizeof(uint8_t);
+			dataSize += rtti_size(data.name);
+			dataSize += rtti_size(data.identifier);
+			dataSize += rtti_size(data.isInternal);
+			dataSize += rtti_size(data.values);
 
-			assert(dataSize <= std::numeric_limits<UINT32>::max());
-
-			return (UINT32)dataSize;
+			rtti_add_header_size(dataSize, compress);
+			return dataSize;
 		}
 	};
 

@@ -329,6 +329,7 @@ namespace bs { namespace ct
 		VkResult result = vkEndCommandBuffer(mCmdBuffer);
 		assert(result == VK_SUCCESS);
 
+		mRenderTarget = nullptr;
 		mState = State::RecordingDone;
 	}
 
@@ -885,6 +886,9 @@ namespace bs { namespace ct
 			newFB = nullptr;
 		}
 
+		mRenderTarget = rt;
+		mRenderTargetModified = false;
+
 		// Warn if invalid load mask
 		if (loadMask.isSet(RT_DEPTH) && !loadMask.isSet(RT_STENCIL))
 		{
@@ -1142,6 +1146,8 @@ namespace bs { namespace ct
 			mClearValues = clearValues;
 			mClearArea = area;
 		}
+
+		notifyRenderTargetModified();
 	}
 
 	void VulkanCmdBuffer::clearRenderTarget(UINT32 buffers, const Color& color, float depth, UINT16 stencil, UINT8 targetMask)
@@ -1679,6 +1685,7 @@ namespace bs { namespace ct
 			instanceCount = 1;
 
 		vkCmdDraw(mCmdBuffer, vertexCount, instanceCount, vertexOffset, 0);
+		notifyRenderTargetModified();
 	}
 
 	void VulkanCmdBuffer::drawIndexed(UINT32 startIndex, UINT32 indexCount, UINT32 vertexOffset, UINT32 instanceCount)
@@ -1724,6 +1731,7 @@ namespace bs { namespace ct
 			instanceCount = 1;
 
 		vkCmdDrawIndexed(mCmdBuffer, indexCount, instanceCount, startIndex, vertexOffset, 0);
+		notifyRenderTargetModified();
 	}
 
 	void VulkanCmdBuffer::dispatch(UINT32 numGroupsX, UINT32 numGroupsY, UINT32 numGroupsZ)
@@ -2614,6 +2622,15 @@ namespace bs { namespace ct
 		}
 	}
 
+	void VulkanCmdBuffer::notifyRenderTargetModified()
+	{
+		if (mRenderTarget == nullptr || mRenderTargetModified)
+			return;
+
+		mRenderTarget->_tickUpdateCount();
+		mRenderTargetModified = true;
+	}
+
 	VulkanCommandBuffer::VulkanCommandBuffer(VulkanDevice& device, GpuQueueType type, UINT32 deviceIdx,
 		UINT32 queueIdx, bool secondary)
 		: CommandBuffer(type, deviceIdx, queueIdx, secondary), mBuffer(nullptr)
@@ -2672,12 +2689,6 @@ namespace bs { namespace ct
 		return readMask;
 	}
 
-
-	VulkanCommandBuffer::~VulkanCommandBuffer()
-	{
-		mBuffer->reset();
-	}
-
 	void VulkanCommandBuffer::acquireNewBuffer()
 	{
 		VulkanCmdBufferPool& pool = mDevice.getCmdBufferPool();
@@ -2691,6 +2702,12 @@ namespace bs { namespace ct
 
 	void VulkanCommandBuffer::submit(UINT32 syncMask)
 	{
+		if (getState() == CommandBufferState::Executing)
+		{
+			BS_LOG(Error, RenderBackend, "Cannot submit a command buffer that's still executing.");
+			return;
+		}
+		
 		// Ignore myself
 		syncMask &= ~mIdMask;
 
@@ -2705,28 +2722,41 @@ namespace bs { namespace ct
 		Vector<VulkanOcclusionQuery*> occlusionQueries;
 		mBuffer->getInProgressQueries(timerQueries, occlusionQueries);
 
-		for (auto& query : timerQueries)
-			query->_interrupt(*mBuffer);
+		if(!timerQueries.empty() || !occlusionQueries.empty())
+		{
+			BS_LOG(Warning, RenderBackend, "Submitting a command buffer with {0} timer queries "
+				"and {1} occlusion queries that are still open. The queries will be closed automatically.",
+				timerQueries.size(), occlusionQueries.size());
 
-		for (auto& query : occlusionQueries)
-			query->_interrupt(*mBuffer);
+			for (auto& query : timerQueries)
+				query->_interrupt(*mBuffer);
 
+			for (auto& query : occlusionQueries)
+				query->_interrupt(*mBuffer);
+		}
+		
 		if (mBuffer->isRecording())
 			mBuffer->end();
 
 		if (mBuffer->isReadyForSubmit()) // Possibly nothing was recorded in the buffer
 		{
 			mBuffer->submit(mQueue, mQueueIdx, syncMask);
-			acquireNewBuffer();
-
 			mDevice.refreshStates(false);
 		}
-
-		// Resume interrupted queries on the new command buffer
-		for (auto& query : timerQueries)
-			query->_resume(*mBuffer);
-
-		for (auto& query : occlusionQueries)
-			query->_resume(*mBuffer);
 	}
+
+	CommandBufferState VulkanCommandBuffer::getState() const
+	{
+		if(mBuffer->isSubmitted())
+			return mBuffer->checkFenceStatus(false) ? CommandBufferState::Done : CommandBufferState::Executing;
+
+		bool recording = mBuffer->isRecording() || mBuffer->isReadyForSubmit() || mBuffer->isInRenderPass();
+		return recording ? CommandBufferState::Recording : CommandBufferState::Empty;
+	}
+
+	void VulkanCommandBuffer::reset()
+	{
+		acquireNewBuffer();
+	}
+
 }}

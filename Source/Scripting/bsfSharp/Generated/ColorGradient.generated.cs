@@ -11,8 +11,9 @@ namespace bs
 	 */
 
 	/// <summary>
-	/// Represents a range of color values over some parameters, similar to a curve. Internally represented as a set of keys
-	/// that get interpolated between.
+	/// Represents a range of color values over some parameters, similar to a curve. Internally represented as a set of keys 
+	/// that get interpolated between. Stores colors as 32-bit integers, and is therefor unable to represent a color range 
+	/// outside of [0, 1] - see ColorGradientHDR for an alternative.
 	/// </summary>
 	[ShowInInspector]
 	public partial class ColorGradient : ScriptObject

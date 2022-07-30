@@ -56,9 +56,6 @@ namespace bs
 		/** Creates a new object of the field type. */
 		virtual SPtr<IReflectable> newObject() = 0;
 
-		/** @copydoc RTTIField::hasDynamicSize */
-		bool hasDynamicSize() override { return true; }
-
 		/** Retrieves the RTTI object for the type the field contains. */
 		virtual RTTITypeBase* getType() = 0;
 	};
@@ -91,7 +88,8 @@ namespace bs
 			this->getter = getter;
 			this->setter = setter;
 
-			init(std::move(name), uniqueId, false, SerializableFT_Reflectable, info);
+			init(std::move(name), RTTIFieldSchema(uniqueId, false, true, 0, SerializableFT_Reflectable,
+				0, nullptr, info));
 		}
 
 		/**
@@ -115,13 +113,19 @@ namespace bs
 			arrayGetSize = getSize;
 			arraySetSize = setSize;
 
-			init(std::move(name), uniqueId, true, SerializableFT_Reflectable, info);
+			const SPtr<RTTISchema>& fieldTypeSchema = DataType::getRTTIStatic()->getSchema();;
+			UINT32 typeId = DataType::getRTTIStatic()->getRTTIId();
+			init(std::move(name), RTTIFieldSchema(uniqueId, true, true, 0, SerializableFT_Reflectable,
+				0, nullptr, info));
 		}
 
-		/** @copydoc RTTIField::getTypeSize */
-		UINT32 getTypeSize() override
+		/** @copydoc RTTIField::initSchema */
+		void initSchema() override
 		{
-			return 0; // Complex types don't store size the conventional way
+			// This need to be initialized after the field itself, otherwise we get recursive static constructor
+			// calls due to one type calling getRTTIStatic() on one another
+			schema.fieldTypeSchema = DataType::getRTTIStatic()->getSchema();;
+			schema.fieldTypeId = DataType::getRTTIStatic()->getRTTIId();
 		}
 
 		/** @copydoc RTTIReflectableFieldBase::getValue */
@@ -156,7 +160,7 @@ namespace bs
 			if(!setter)
 			{
 				BS_EXCEPT(InternalErrorException,
-					"Specified field (" + mName + ") has no setter.");
+					"Specified field (" + name + ") has no setter.");
 			}
 
 			InterfaceType* rttiObject = static_cast<InterfaceType*>(rtti);
@@ -174,7 +178,7 @@ namespace bs
 			if(!arraySetter)
 			{
 				BS_EXCEPT(InternalErrorException,
-					"Specified field (" + mName + ") has no setter.");
+					"Specified field (" + name + ") has no setter.");
 			}
 
 			InterfaceType* rttiObject = static_cast<InterfaceType*>(rtti);
@@ -203,7 +207,7 @@ namespace bs
 			if(!arraySetSize)
 			{
 				BS_EXCEPT(InternalErrorException,
-					"Specified field (" + mName + ") has no array size setter.");
+					"Specified field (" + name + ") has no array size setter.");
 			}
 
 			InterfaceType* rttiObject = static_cast<InterfaceType*>(rtti);
